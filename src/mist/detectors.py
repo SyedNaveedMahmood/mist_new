@@ -71,3 +71,16 @@ DETECTORS = {"spindle": spindles, "slow_wave": slow_waves, "alpha": alpha}
 def token_overlap(mask, token_index):
     """Fraction of each token's samples inside events; token_index rows are (epoch, start_sample, length)."""
     return np.array([mask[e, s:s + n].mean() for e, s, n in token_index])
+
+
+def name_slots(top_overlap: dict, base: dict, min_lift=2.0, min_overlap=0.3) -> dict:
+    """top_overlap[det][slot] and base[det] -> {slot: (name or None, lifts)}."""
+    n_slots = len(next(iter(top_overlap.values())))
+    out = {}
+    for k in range(n_slots):
+        lifts = {d: float(top_overlap[d][k] / max(base[d], 1e-9)) for d in top_overlap}
+        best = max(lifts, key=lifts.get)
+        ok = lifts[best] >= min_lift and top_overlap[best][k] >= min_overlap
+        out[k] = {"name": best if ok else None, "lift": lifts,
+                  "overlap": {d: float(top_overlap[d][k]) for d in top_overlap}}
+    return out

@@ -34,3 +34,13 @@ def test_alpha_and_slow_wave():
 def test_token_overlap():
     m = np.zeros((2, 3000), bool); m[1, 100:200] = True
     assert token_overlap(m, [(1, 100, 100), (1, 150, 100), (0, 0, 100)]).tolist() == [1.0, 0.5, 0.0]
+
+
+def test_name_slots_requires_lift_and_overlap():
+    from mist.detectors import name_slots
+    top = {"spindle": np.array([0.6, 0.1, 0.25]), "alpha": np.array([0.1, 0.1, 0.05])}
+    base = {"spindle": 0.1, "alpha": 0.1}
+    n = name_slots(top, base)
+    assert n[0]["name"] == "spindle"          # lift 6, overlap 0.6
+    assert n[1]["name"] is None               # lift 1
+    assert n[2]["name"] is None               # lift 2.5 but overlap 0.25 < 0.3
