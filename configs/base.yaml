@@ -1,4 +1,5 @@
 # Shared defaults. Arms in configs/arms/ override the `model` block.
+# The `train` block is the frozen phase-1 recipe (2026-11-23); see experiments/registry.yaml id recipe_frozen.
 data:
   cohort: SC
   channel: "Fpz-Cz"
@@ -17,7 +18,7 @@ train:
   weight_decay: 1.0e-2
   grad_clip: 1.0
   label_smoothing: 0.0
-  class_weight: null   # null | sqrt_inv
+  class_weight: sqrt_inv   # RECIPE FROZEN 2026-11-23 (registry: recipe_frozen). Full 40-epoch schedule, best-val checkpoint, no early stopping. Do not change.
   n1_weight: null      # E4 control arm: extra loss weight on N1
   num_workers: 4
 model:
