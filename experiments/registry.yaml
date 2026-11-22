@@ -12,7 +12,29 @@
 #   evals: [runs/e0_attnsleep_cv0_s0/eval_test_cv_Fpz-Cz.json]
 #   status: VERIFIED | CONDITIONAL | BLOCKED | UNKNOWN | NOT TESTED
 #   note: one line, including anything odd
-runs: []
+runs:
+  - id: t3_attnsleep_cv0_s0
+    date: '2026-11-22'
+    commit: b96f6e0
+    arm: attnsleep
+    overrides: {split.fold: 0, train.seed: 0}
+    split_file: splits/sleepedf_v1.json
+    protocol: cv
+    train_channel: Fpz-Cz
+    view: std
+    evals: [runs/t3_attnsleep_cv0_s0/eval_test_cv_Fpz-Cz.json]
+    status: VERIFIED
+    note: 'Gate G0b FAILED: test macro-F1 0.6999 (pooled, 11 people) < 0.70; subject-mean 0.667; best val 0.721 at epoch 12 of 21; 3.9 s/epoch, peak 1327 MB. Label/signal alignment vs legacy EDF-20 NPZ checked
+      OK on 6 nights'
+  - id: e5a_invariance_10n
+    date: '2026-11-22'
+    commit: b96f6e0
+    script: scripts/check_invariance.py --n-nights 10 (Fpz-Cz and Pz-Oz)
+    split_file: splits/sleepedf_v1.json
+    evals: [runs/e5a/invariance_Fpz-Cz_summary.json, runs/e5a/invariance_Pz-Oz_summary.json]
+    status: VERIFIED
+    note: 'first 10 dev nights (SC 00-05, young), std view, 1 s window. Gain x3: dG=dR=dM=0. Zero-phase tilt: max 0.0029/0.0076/0.0064 (G/R/M). All-pass: dM 0.659, dR 0.08, dG 0.03 - G and R are not fully
+      phase-blind on real 30-s epochs'
 
 datasets:
   sleep-edfx: {licence: "ODC Attribution 1.0", status: VERIFIED, note: "licence read from PhysioNet page 2026-11-18"}
