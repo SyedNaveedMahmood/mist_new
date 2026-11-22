@@ -57,17 +57,23 @@ def find_pairs(folder: Path) -> list:
     return pairs
 
 
-def labels_from_annotations(onsets, durations, descriptions, n_epochs: int, epoch_s: float = 30.0) -> np.ndarray:
-    """Fill a 30-s grid. Unknown descriptions raise; partial epochs stay unscored."""
+def labels_from_annotations(onsets, durations, descriptions, n_epochs: int, epoch_s: float = 30.0,
+                            stage_map: dict | None = None, ignore: tuple = ()) -> np.ndarray:
+    """Fill a 30-s grid. Unknown descriptions raise; partial epochs stay unscored.
+
+    stage_map defaults to the Sleep-EDF (R&K) map; descriptions in `ignore` are skipped."""
+    stage_map = STAGE_MAP if stage_map is None else stage_map
     y = np.full(n_epochs, UNSCORED, dtype=np.int8)
     for on, du, de in zip(onsets, durations, descriptions):
         de = str(de)
-        if de not in STAGE_MAP:
+        if de in ignore:
+            continue
+        if de not in stage_map:
             raise ValueError(f"unexpected annotation {de!r}")
         first = int(np.ceil(on / epoch_s - 1e-6))
         last = int(np.floor((on + du) / epoch_s + 1e-6))
         if first < last:
-            y[first:min(last, n_epochs)] = STAGE_MAP[de]
+            y[first:min(last, n_epochs)] = stage_map[de]
     return y
 
 
