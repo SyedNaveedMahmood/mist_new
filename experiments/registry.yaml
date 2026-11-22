@@ -35,6 +35,79 @@ runs:
     status: VERIFIED
     note: 'first 10 dev nights (SC 00-05, young), std view, 1 s window. Gain x3: dG=dR=dM=0. Zero-phase tilt: max 0.0029/0.0076/0.0064 (G/R/M). All-pass: dM 0.659, dR 0.08, dG 0.03 - G and R are not fully
       phase-blind on real 30-s epochs'
+  - id: recipe_sweep_classweight
+    date: '2026-11-23'
+    commit: various (ea69092..1d028d8; training path unchanged across them)
+    script: scripts/run_classweight_sweep.sh
+    split_file: splits/sleepedf_v1.json
+    protocol: cv
+    train_channel: Fpz-Cz
+    view: std
+    runs: [runs/cw_attnsleep_null_cv0_s0, runs/cw_attnsleep_null_cv1_s0, runs/cw_attnsleep_null_cv2_s0, runs/cw_attnsleep_null_cv3_s0, runs/cw_attnsleep_null_cv4_s0, runs/cw_raw_null_cv0_s0, runs/cw_raw_null_cv1_s0,
+      runs/cw_raw_null_cv2_s0, runs/cw_raw_null_cv3_s0, runs/cw_raw_null_cv4_s0, runs/cw_attnsleep_sqrt_inv_cv0_s0, runs/cw_attnsleep_sqrt_inv_cv1_s0, runs/cw_attnsleep_sqrt_inv_cv2_s0, runs/cw_attnsleep_sqrt_inv_cv3_s0,
+      runs/cw_attnsleep_sqrt_inv_cv4_s0, runs/cw_raw_sqrt_inv_cv0_s0, runs/cw_raw_sqrt_inv_cv1_s0, runs/cw_raw_sqrt_inv_cv2_s0, runs/cw_raw_sqrt_inv_cv3_s0, runs/cw_raw_sqrt_inv_cv4_s0]
+    evals: [runs/cw_attnsleep_null_cv0_s0/train_summary.json, runs/cw_attnsleep_null_cv1_s0/train_summary.json, runs/cw_attnsleep_null_cv2_s0/train_summary.json, runs/cw_attnsleep_null_cv3_s0/train_summary.json,
+      runs/cw_attnsleep_null_cv4_s0/train_summary.json, runs/cw_raw_null_cv0_s0/train_summary.json, runs/cw_raw_null_cv1_s0/train_summary.json, runs/cw_raw_null_cv2_s0/train_summary.json, runs/cw_raw_null_cv3_s0/train_summary.json,
+      runs/cw_raw_null_cv4_s0/train_summary.json, runs/cw_attnsleep_sqrt_inv_cv0_s0/train_summary.json, runs/cw_attnsleep_sqrt_inv_cv1_s0/train_summary.json, runs/cw_attnsleep_sqrt_inv_cv2_s0/train_summary.json,
+      runs/cw_attnsleep_sqrt_inv_cv3_s0/train_summary.json, runs/cw_attnsleep_sqrt_inv_cv4_s0/train_summary.json, runs/cw_raw_sqrt_inv_cv0_s0/train_summary.json, runs/cw_raw_sqrt_inv_cv1_s0/train_summary.json,
+      runs/cw_raw_sqrt_inv_cv2_s0/train_summary.json, runs/cw_raw_sqrt_inv_cv3_s0/train_summary.json, runs/cw_raw_sqrt_inv_cv4_s0/train_summary.json]
+    validation_macro_f1_best_epoch:
+      per_fold_0_to_4:
+        attnsleep/null: [0.7296, 0.7128, 0.7073, 0.7496, 0.7118]
+        attnsleep/sqrt_inv: [0.741, 0.7243, 0.7018, 0.7511, 0.7305]
+        raw/null: [0.7566, 0.7469, 0.7359, 0.7716, 0.7506]
+        raw/sqrt_inv: [0.7688, 0.7452, 0.7315, 0.7826, 0.76]
+      mean_over_folds: {attnsleep/null: 0.7222, attnsleep/sqrt_inv: 0.7297, raw/null: 0.7523, raw/sqrt_inv: 0.7576}
+      mean_over_both_models: {'null': 0.7373, sqrt_inv: 0.7437}
+    status: VERIFIED
+    note: Recipe step 1b. VALIDATION ONLY (no test set evaluated). Full 40-epoch schedule, best-val checkpoint. cw_raw_sqrt_inv_cv4_s0 was interrupted at epoch 35 by a session end and retrained from scratch
+      (partial run kept in runs/_interrupted/). sqrt_inv > null on 8 of 10 model-fold pairs.
+  - id: recipe_frozen
+    date: '2026-11-23'
+    commit: 630371d
+    config: configs/base.yaml train block
+    recipe: {epochs: 40, early_stopping: none, checkpoint: best validation macro-F1, batch_size: 32, lr: 0.001, weight_decay: 0.01, grad_clip: 1.0, label_smoothing: 0.0, class_weight: sqrt_inv}
+    decision_rule: 'owner 2026-11-22: sqrt_inv only if mean validation macro-F1 over attnsleep and raw beats null by >= 0.5 points'
+    validation_table:
+      attnsleep: {'null': 0.7222, sqrt_inv: 0.7297}
+      raw: {'null': 0.7523, sqrt_inv: 0.7576}
+      mean_both: {'null': 0.7373, sqrt_inv: 0.7437}
+      difference_points: 0.64
+    evals: [see recipe_sweep_classweight]
+    status: VERIFIED
+    note: 'recipe frozen: class_weight = sqrt_inv (+0.64 points, margin 0.14 points above the threshold, so the choice is close). Chosen on validation people only. No further recipe changes in phase 1.'
+  - id: correction_t3_attnsleep_cv0_s0
+    date: '2026-11-23'
+    commit: 630371d
+    corrects: t3_attnsleep_cv0_s0
+    evals: []
+    status: VERIFIED
+    note: t3_attnsleep_cv0_s0 (test macro-F1 0.6999, G0b failed) was trained with the PRE-FIX RECIPE (early stopping patience 8, stopped at epoch 21; class_weight null). Kept as history; it does not decide
+      G0b under the owner's redefinition, which uses the frozen recipe (entry recipe_frozen).
+  - id: g0b_attnsleep_5fold_s0
+    date: '2026-11-23'
+    commit: 630371d
+    arm: attnsleep
+    runs: [runs/cw_attnsleep_sqrt_inv_cv0_s0, runs/cw_attnsleep_sqrt_inv_cv1_s0, runs/cw_attnsleep_sqrt_inv_cv2_s0, runs/cw_attnsleep_sqrt_inv_cv3_s0, runs/cw_attnsleep_sqrt_inv_cv4_s0]
+    split_file: splits/sleepedf_v1.json
+    protocol: cv
+    train_channel: Fpz-Cz
+    test_channel: Fpz-Cz
+    view: std
+    evals: [runs/cw_attnsleep_sqrt_inv_cv0_s0/eval_test_cv_Fpz-Cz.json, runs/cw_attnsleep_sqrt_inv_cv1_s0/eval_test_cv_Fpz-Cz.json, runs/cw_attnsleep_sqrt_inv_cv2_s0/eval_test_cv_Fpz-Cz.json, runs/cw_attnsleep_sqrt_inv_cv3_s0/eval_test_cv_Fpz-Cz.json,
+      runs/cw_attnsleep_sqrt_inv_cv4_s0/eval_test_cv_Fpz-Cz.json]
+    result:
+      pooled_test_macro_f1: 0.7277
+      acc: 0.7834
+      kappa: 0.7073
+      f1: {W: 0.9139, N1: 0.4162, N2: 0.8183, N3: 0.7717, REM: 0.7183}
+      per_fold_macro_f1: [0.7257, 0.7377, 0.7103, 0.7077, 0.7542]
+      n_people: 54
+      n_epochs: 133551
+    status: VERIFIED
+    note: 'Gate G0b (owner redefinition 2026-11-22: attnsleep 5-fold pooled test macro-F1, std, Fpz-Cz, seed 0 >= 0.70) PASSED at 0.7277. Frozen recipe (recipe_frozen). Evaluated once. Checks: each fold''s
+      tested people == split test people, disjoint from train/val and lockbox; all 54 dev people tested once. Scope: Sleep-EDF SC dev people (ages 25-~90 excluding lockbox), std view. Below the published
+      EDF-20 figure (0.781), which uses a different cohort and protocol; see replication section.'
 
 datasets:
   sleep-edfx: {licence: "ODC Attribution 1.0", status: VERIFIED, note: "licence read from PhysioNet page 2026-11-18"}

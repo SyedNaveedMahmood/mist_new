@@ -54,3 +54,12 @@ Decisions taken by Claude Code while the owner is offline (delegation of 2026-11
 - **Options:** (a) wait for the quota to reset and resume; (b) switch to the Google Drive mirror listed on the ISRUC site; (c) create a MEGA account.
 - **Chosen:** (a). The fetch is resumable (complete files are skipped by size); retry scheduled 3 h later with a 30 min timeout per file. (c) is reserved for the owner (account creation). (b) stays as a fallback if MEGA keeps refusing.
 - **Reversible:** yes.
+
+### 2026-11-23 - D-008: class-weight sweep finished after a session break; recipe frozen
+- **Came up:** The session ended while the last sweep run (cw_raw_sqrt_inv_cv4_s0) was at epoch 35 of 40. Training has no resume.
+- **Chosen:** moved the partial run to runs/_interrupted/ (kept, not deleted) and retrained it from scratch with the same seed. The 20 runs were trained at different commits; the only training-path changes between them are a behaviour-preserving refactor of the std trim and passing `y` to the model (read only by the GRM critic), so the runs are comparable.
+- **Result (validation only):** sqrt_inv 0.7437 vs null 0.7373 mean over attnsleep and raw, +0.64 points, so by the owner's rule class_weight = sqrt_inv. The margin over the 0.5-point threshold is small (0.14 points); recorded so the choice is not read as a strong effect.
+- **Reversible:** no, by owner instruction the recipe is frozen for phase 1.
+
+### 2026-11-23 - D-009: G0b evaluation shared with E0 seed 0
+- **Chosen:** G0b was evaluated once with scripts/evaluate.py defaults on runs/cw_attnsleep_sqrt_inv_cv*_s0. E0 seed 0 links to the same run folders, so E0 reads the same eval files instead of recomputing them. No score was looked at before the recipe was frozen (commit 630371d precedes the evaluation).
