@@ -1,6 +1,6 @@
 # MIST-GRM architecture
 
-Status: implemented in `src/mist/models/`, unit-tested on synthetic signals, **not yet trained on real EEG**.
+Status: sections 1 to 7 describe the **parallel** topology (v1), implemented in `src/mist/models/` and unit-tested. **Revision 2 (2026-11-22, supervisor): the main model is now the cascade in section 8**, where rhythm feeds morphology and only gain and morphology reach the composer. The cascade is specified but NOT IMPLEMENTED and NOT TESTED; the parallel model stays as an ablation arm.
 
 ## 1. Idea in one paragraph
 
@@ -123,6 +123,8 @@ At test time, `destroy_prob=1.0` or `knock=("M",)` measures how much a trained m
 
 ## 5. Arms (configs/arms)
 
+These are the parallel-topology arms that exist today. The cascade arms are listed in section 8.4.
+
 | Arm | Streams | Purpose |
 | --- | --- | --- |
 | `raw` | X | Unfactorised control with the same tokeniser, composer and context |
@@ -147,3 +149,108 @@ At test time, `destroy_prob=1.0` or `knock=("M",)` measures how much a trained m
 ## 7. Not built yet (see docs/TASKS.md)
 
 Slot-family knockouts and naming; stage-targeted critic; masked-token pretraining; training on more than one derivation at once; the magnitude/phase STFT baseline that mirrors the closest prior work; SleepBand, WaveSleepNet and TinySleepNet baselines.
+
+## 8. Revision 2 (2026-11-22): cascade topology, rhythm before morphology
+
+Status: **specified, NOT IMPLEMENTED, NOT TESTED.** Requested by the supervisor on the architecture slide and relayed by the owner. Task T6b in docs/TASKS.md implements it.
+
+### 8.1 What changed on the diagram
+
+Three marks on the slide: the arrow factoriser -> M is crossed out, an arrow R -> M is added, and the arrow R -> composer is crossed out. G -> composer is untouched.
+
+```
+v1 parallel (sections 1-7)            v2 cascade (this section)
+
+factorise -> G -> compose             factorise -> G ---------> compose
+factorise -> R -> compose             factorise -> R -> M ----> compose
+factorise -> M -> compose
+```
+
+### 8.2 How the drawing is read (an assumption; confirm with the supervisor)
+
+Read literally with the v1 definitions, the cascade cannot work: R is built from the magnitude spectrum only, so it holds no phase, and morphology cannot be computed from it. The reading adopted here keeps every v1 quantity and changes the routing:
+
+- **R becomes the rhythm-decomposition stage.** It still produces the phase-blind rhythm code. It also splits the token's bins into rhythm bands and hands each band's phase on to M.
+- **M becomes "the shape of each rhythm".** It encodes a power-blind waveform per band and is modulated by the rhythm code, so a shape is read in the context of which rhythm is active.
+- **Only G and the rhythm-gated M output reach the composer.** Rhythm has no path of its own.
+
+The alternative reading, "rhythm is only a conditioning signal for a broadband M", is the special case with one band. It is kept as the `cascade_broad` ablation.
+
+### 8.3 Specification
+
+Unchanged from section 3: night whitening, tokenising, `z(f)`, `G`, `R(f)`, `phi(f)`.
+
+Bands (Hz, lower edge inclusive): delta 0.5-4, theta 4-8, alpha 8-12, sigma 12-16, beta 16-35. Sigma is separate because spindles define N2; there is no gamma band because the signal is limited to 35 Hz. With 1 s tokens the narrow bands hold 3 to 4 bins each; with 4 s tokens 14 to 16.
+
+```
+r        = RhythmEncoder(R)                      rhythm code, phase-blind (as in v1)
+m_b      = irfft( exp(i*phi(f)) for f in band b ), unit RMS      b = delta..beta
+m_0      = irfft( exp(i*phi(f)) for all in-band f ), unit RMS    broadband channel = the v1 M input
+e_b      = WaveEncoder(m_b) + band_embedding_b   shared encoder, b = 0..5
+a_b      = ShapeCodebook_b(e_b)                  soft assignment over 16 shape slots per band
+g_b      = softplus( Linear_b(r) )               one positive gate vector per band, from rhythm
+u        = sum_b  g_b * ( P_b a_b + W_b e_b )    P_b: slot embeddings; W_b: capped residual (8 dims)
+token    = proj( [ GainEmbed(G), u ] )           then composer, context and head as in v1
+```
+
+Notes:
+
+- The band waveforms sum (before normalisation) to the v1 morphology token, so nothing v1 could see is removed. They are organised by rhythm.
+- `m_0` keeps phase alignment across bands, which is what makes a transient sharp. Without it a K-complex edge or a sawtooth wave would be split across bands.
+- Rhythm enters only multiplicatively, through `g_b`. There is no additive bypass, in line with the crossed-out arrow.
+- The critic acts on each `e_b`, so its accuracy per band says where beyond-spectrum structure lives.
+
+### 8.4 Switches and arms
+
+| Switch | Config (planned) | Effect |
+| --- | --- | --- |
+| Morphology off | `destroy_prob: 1.0` | Every band gets random phase. `G` and `r` are untouched, so the model is exactly a gain-plus-rhythm model with the same parameters |
+| Morphology of one rhythm off | `destroy_bands: [sigma]` at test | Removes the shape of that band only |
+| Rhythm off | `knock: [R]` (gates set to their training mean) | Shape without rhythm context |
+| Gain off | `knock: [G]` | As in v1 |
+| Dial | `critic_weight`, `destroy_prob` | As in v1 |
+
+| Arm | Topology | Purpose |
+| --- | --- | --- |
+| `cascade` | cascade, 5 bands + broadband, critic on | **Main model** |
+| `cascade_placebo` | cascade, `destroy_prob: 1.0` | Gain plus rhythm through the same path; replaces `gr` and `grm_placebo` as the reference for H1 |
+| `cascade_nocritic` | cascade, `critic_weight: 0` | Dial at zero |
+| `cascade_bands` | cascade without the broadband channel | Does cross-band phase alignment matter? |
+| `cascade_broad` | cascade with the broadband channel only | Rhythm as conditioning only (the alternative reading) |
+| `grm`, `gr` | parallel (v1) | Topology ablation: does routing rhythm through morphology change anything? |
+
+### 8.5 Properties to prove before any cascade result counts
+
+Each needs a unit test in `tests/` next to the existing invariance tests (CLAUDE.md rule 6).
+
+| Property | Expected |
+| --- | --- |
+| `G`, `r`, every `m_b` unchanged by a positive gain | exact |
+| `r` and every gate `g_b` are functions of |X| only | exact |
+| every `m_b`, `e_b`, `a_b` is a function of arg X only | exact |
+| the unnormalised band waveforms sum to the v1 morphology token | exact |
+| with `destroy_prob: 1.0`, `G` and `r` equal their values on the real token | exact |
+| smooth zero-phase filter leaves `G`, `r`, `m_b` nearly unchanged | approximate, as in section 3 |
+
+What no longer holds: the vector that reaches the composer from M is not power-blind. Power-blindness holds for M's inputs and its shape slots, not for its gated output. "Remove R" and "remove M" are no longer independent switches.
+
+### 8.6 What the change buys and what it costs
+
+Buys:
+
+- RQ2 gets families by construction. "Which morphology matters" becomes a band-by-stage table (shape of delta, theta, alpha, sigma, beta, broadband), with no after-the-fact naming of slots.
+- The reference model for RQ1 is the same network with scrambled phase, so parameter counts match exactly and gate G3 is not needed for the cascade.
+- The design sits closer to Zhou et al. (2026), who also decompose into rhythms first. Their band signals keep amplitude and phase together; here the two are separated inside each band. That makes their model a natural comparator.
+
+Costs and risks:
+
+- All rhythm information must pass through the M stage. If that stage is a bottleneck, in-domain accuracy falls. Gate G2 is checked for `cascade` against `raw` and against `grm`.
+- With 1 s tokens a narrow band has 3 to 4 phases, so its shape code carries little. Most per-band shape information will come from the 4 s tokens. (inference)
+- Phase distortion still reaches every band. Inside a narrow band a smooth phase response is close to a constant offset plus a delay, which may be easier to ignore. (speculation)
+- More parts: six encoder passes per token instead of one. The M stage will cost several times what it does in `grm`; the factor is unknown until T6b times a run. (speculation)
+
+### 8.7 Questions for the supervisor
+
+1. Does R -> M mean "morphology within each rhythm band" (adopted), or "rhythm as a conditioning signal for one broadband morphology stream" (`cascade_broad`)?
+2. Should rhythm really have no direct path to the composer? A skip connection is the usual safeguard; it is left out because the arrow was crossed out.
+3. The slide also carried a figure of a 1-D EEG trace with sharp transients. Was that meant as an instruction (for example, morphology should be read from the raw trace), or as an illustration?

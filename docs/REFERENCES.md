@@ -32,6 +32,8 @@ Vallat, R., & Walker, M. P. (2021). An open-source, high-performance tool for au
 
 Yang, C., Xiao, C., Westover, M. B., & Sun, J. (2023). Self-supervised electroencephalogram representation learning for automatic sleep staging: Model development and evaluation study. *JMIR AI, 2*, e46769. https://doi.org/10.2196/46769
 
+Zhou, H., Liu, A., Cui, H., Wan, F., Wang, Y., & Chen, X. (2026). Single-channel EEG-based sleep staging with rhythm representation and contrastive learning. *Biomedical Signal Processing and Control, 112*, 108623. https://doi.org/10.1016/j.bspc.2025.108623
+
 ## B. Identified by title only (authors to be completed)
 
 *A multi-level interpretable sleep stage scoring system by ...* arXiv. https://arxiv.org/abs/2207.04585

@@ -175,3 +175,22 @@ Adopt the single-source protocol of SleepBand (train on one of Sleep-EDF, HMC, I
 - Labels: VERIFIED, CONDITIONAL, BLOCKED, UNKNOWN, NOT TESTED.
 - Negative and null results are recorded in the registry with the same detail as positive ones.
 - No "transfer" wording for anything inside Sleep-EDF without the qualifier "within-database".
+
+## 11. Revision 2 (2026-11-22): what the cascade changes in this plan
+
+The supervisor's cascade topology (docs/ARCHITECTURE.md, section 8) becomes the main model. No model with a morphology stream had been evaluated on any test set when this was written, so the changes below are made before the fact.
+
+| Item | Before | Now |
+| --- | --- | --- |
+| H1 decisive pair | `grm` vs `gr`, with `grm_placebo` as control | `cascade` vs `cascade_placebo` (same network, phase real vs scrambled). `grm` vs `gr` is reported as the parallel-topology replicate |
+| H2 dose | on `grm` | on `cascade` |
+| H3 | `gr` vs `raw`; `grm` vs `grm_absolute` | `cascade_placebo` vs `raw`; `cascade` vs a cascade without the night reference |
+| H4 / RQ2a | stream x stage matrix, then slot families named after the fact | band x stage matrix from `destroy_bands` (delta, theta, alpha, sigma, beta, broadband), in-domain and under each shift. Slot galleries become descriptive only |
+| H5, H6 | `grm` vs `gr`, `gr` + N1 weight | `cascade` vs `cascade_placebo`, `cascade_placebo` + N1 weight |
+| Gate G2 | `grm` within 1.5 points of `raw` | `cascade` within 1.5 points of `raw`; if it fails, compare with `grm` to see whether the routing is the cause |
+| Gate G3 | placebo vs `gr` | not needed for the cascade (identical parameters by construction); kept for the parallel arms |
+| New, exploratory | | `cascade` vs `grm` under each shift: does routing rhythm through morphology matter? Outside the Holm family |
+
+E0 is unchanged: it uses `raw` and `attnsleep` only. The recipe stays frozen.
+
+Extra trainings: `cascade`, `cascade_placebo`, `cascade_nocritic`, `cascade_bands`, `cascade_broad` under `cv` (5 x 15 = 75), plus `cascade` and `cascade_placebo` under the age protocols and Pz-Oz (2 x 21 = 42). To stay inside the budget, drop `r`, `m` and `grm_loose` to one seed first.

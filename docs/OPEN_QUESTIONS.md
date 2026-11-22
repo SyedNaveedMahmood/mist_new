@@ -8,3 +8,6 @@ Items reserved for the owner (delegation of 2026-11-22). Claude Code has moved o
 | Q2 | 2026-11-22 | SHHS, MASS, MESA, MrOS need data-use applications (NSRR DUA; MASS via CEAMS with ethics approval). | Applications and third-party contact | Phase 2 extensions, T16 |
 | Q3 | 2026-11-22 | `src/mist/models/attnsleep.py` came from the earlier project; upstream AttnSleep licence must be checked before the repo is made public. | Making the repo public / licence | Publication only |
 | Q4 | 2026-11-22 | T12/E6 lockbox evaluation. | Lockbox | E6 only |
+| Q5 | 2026-11-22 | Supervisor: does R -> M mean morphology within each rhythm band (adopted in ARCHITECTURE section 8), or rhythm as a conditioning signal for one broadband morphology stream? | Supervisor's intent | T6b default is the per-band reading; `cascade_broad` covers the other |
+| Q6 | 2026-11-22 | Supervisor: should rhythm have no direct path to the composer at all? A skip connection was left out because the arrow was crossed out. | Supervisor's intent | Not blocking; affects gate G2 if the cascade loses in-domain accuracy |
+| Q7 | 2026-11-22 | Supervisor: the slide carried a figure of a 1-D EEG trace with sharp transients. Instruction or illustration? | Supervisor's intent | Not blocking |

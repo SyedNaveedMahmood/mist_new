@@ -16,6 +16,7 @@ Phase 1 runs on Sleep-EDF Expanded only. Nothing has been trained on real EEG ye
 | Invariance to smooth zero-phase filters | VERIFIED on synthetic 1/f noise (about 1% change against 17 to 33% for raw tokens); NOT TESTED on real EEG |
 | Sleep-EDF reader | Tested on a synthetic EDF pair; NOT TESTED on the real files |
 | Splits | Code ready; file not generated (needs the real manifest and decision D1) |
+| Cascade topology (supervisor revision, 2026-11-22; docs/ARCHITECTURE.md section 8) | Specified; NOT IMPLEMENTED (task T6b) |
 | Any result on RQ1 or RQ2 | NOT TESTED |
 | Novelty | Screened, not guaranteed: see docs/NOVELTY_CHECK.md |
 

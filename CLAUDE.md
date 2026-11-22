@@ -39,6 +39,7 @@ Configs merge `configs/base.yaml`, then `configs/arms/<arm>.yaml`, then `key=val
 
 - `src/mist/data/sleepedf.py` has not read a real Sleep-EDF file. Task T1 checks it, including the spreadsheet columns and seven ST hypnograms with unusual headers.
 - All evidence for the design so far is on synthetic signals.
+- The cascade topology (`docs/ARCHITECTURE.md`, section 8) is the main model since 2026-11-22 but exists only on paper. Its by-construction claims are unproved until the tests in section 8.5 exist and pass. The reading of the supervisor's sketch is an assumption.
 - The morphology stream is sensitive to phase distortion (see `docs/ARCHITECTURE.md`, section 6). Expect this to matter on the cohort shift.
 - `src/mist/models/attnsleep.py` came from the earlier project; check the upstream licence before the repository is made public.
 
