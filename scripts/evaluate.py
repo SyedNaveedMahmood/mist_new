@@ -3,7 +3,8 @@
 
 Reports every (condition, intervention) cell needed by E0 and E3:
   conditions     real, global_phase, local_phase, flatten_tilt   (input surrogates)
-  interventions  none, knock G / R / M, destroy M (random phase inside the model)
+  interventions  none, knock G / R / M, destroy M (random phase inside the model);
+                 cascade only: destroy_<band> for delta..beta and broad (ARCHITECTURE 8.4)
 
     python scripts/evaluate.py --run runs/grm_cv0_s0 --channel Pz-Oz
 """
@@ -42,17 +43,23 @@ def main():
         cfg["data"]["view"] = a.view          # window only; the night reference is recomputed inside it
     ds = make_dataset(nights, cfg, channel, train=False)
     streams = cfg["model"].get("streams", []) if cfg["model"].get("name", "mist_grm") == "mist_grm" else []
-    cells = [("real", (), None), ("global_phase", (), None), ("local_phase", (), None), ("flatten_tilt", (), None)]
-    cells += [("real", (s,), None) for s in streams if s in "GRM" and len(streams) > 1]
+    cells = [("real", (), None, ()), ("global_phase", (), None, ()), ("local_phase", (), None, ()),
+             ("flatten_tilt", (), None, ())]
+    cells += [("real", (s,), None, ()) for s in streams if s in "GRM" and len(streams) > 1]
     if "M" in streams:
-        cells.append(("real", (), 1.0))
+        cells.append(("real", (), 1.0, ()))
+    if cfg["model"].get("topology") == "cascade":
+        from mist.models.cascade import BAND_NAMES, CHANNEL_SETS
+        has_broad = "broad" in CHANNEL_SETS[cfg["model"].get("cascade_channels", "all")]
+        cells += [("real", (), None, (b,)) for b in BAND_NAMES + (("broad",) if has_broad else ())]
     out = {"protocol": protocol, "channel": channel, "n_nights": len(nights), "view": cfg["data"].get("view", "std"),
            "night_meta": {n.record_id: {"subject": n.subject, "condition": n.meta.get("condition")} for n in nights},
            "cells": {}}
-    for cond, knock, destroy in cells:
-        key = cond + ("" if not knock else f"|knock_{''.join(knock)}") + ("" if destroy is None else "|destroy_M")
+    for cond, knock, destroy, bands in cells:
+        key = (cond + ("" if not knock else f"|knock_{''.join(knock)}") + ("" if destroy is None else "|destroy_M")
+               + "".join(f"|destroy_{b}" for b in bands))
         summ, cms, ncms = evaluate(model, ds, device, return_night_cms=True, condition=cond, knock=knock,
-                                   destroy_prob=destroy)
+                                   destroy_prob=destroy, destroy_bands=bands)
         out["cells"][key] = {"summary": summ, "subject_cm": {k: v.tolist() for k, v in cms.items()},
                              "night_cm": {k: v.tolist() for k, v in ncms.items()}}
         print(key, {k: round(v, 4) for k, v in summ.items() if k in ("mf1", "acc", "kappa", "f1_N1")})

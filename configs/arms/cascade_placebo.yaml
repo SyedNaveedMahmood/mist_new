@@ -1,0 +1,2 @@
+# Same network as cascade; every band only ever sees random phase (gain + rhythm through the same path).
+model: {topology: cascade, cascade_channels: all, streams: [G, R, M], morph_input: phase_only, destroy_prob: 1.0, critic_weight: 0.0}

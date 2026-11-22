@@ -44,14 +44,15 @@ def make_dataset(nights, cfg, channel, train):
 
 @torch.no_grad()
 def predict(model, ds, device, condition="real", knock=(), destroy_prob=None, batch_size=32, seed=0,
-            return_records=False):
+            return_records=False, destroy_bands=()):
     """Return true labels, predictions and subject ids for every scored epoch of `ds`."""
     model.eval()
     gen = torch.Generator(device="cpu").manual_seed(seed)
     ys, ps, ss, rs = [], [], [], []
     for batch in DataLoader(ds, batch_size=batch_size, shuffle=False):
         x = CONDITIONS[condition](batch["x"].float(), gen).to(device)
-        logits, _ = model(x, split_stats(batch, device), knock=knock, destroy_prob=destroy_prob)
+        extra = {"destroy_bands": tuple(destroy_bands)} if destroy_bands else {}
+        logits, _ = model(x, split_stats(batch, device), knock=knock, destroy_prob=destroy_prob, **extra)
         keep = batch["keep"].numpy()
         ys.append(batch["y"].numpy()[keep])
         ps.append(logits.argmax(-1).cpu().numpy()[keep])

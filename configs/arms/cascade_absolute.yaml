@@ -1,0 +1,2 @@
+# Cascade without the night reference (H3 under EXPERIMENT_PLAN section 11).
+model: {topology: cascade, cascade_channels: all, streams: [G, R, M], morph_input: phase_only, critic_weight: 0.3, allpass_rad: 0.5, night_relative: false}

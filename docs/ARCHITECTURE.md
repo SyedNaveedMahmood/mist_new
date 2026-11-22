@@ -152,7 +152,7 @@ Slot-family knockouts and naming; stage-targeted critic; masked-token pretrainin
 
 ## 8. Revision 2 (2026-11-22): cascade topology, rhythm before morphology
 
-Status: **specified, NOT IMPLEMENTED, NOT TESTED.** Requested by the supervisor on the architecture slide and relayed by the owner. Task T6b in docs/TASKS.md implements it.
+Status: **IMPLEMENTED 2026-11-23** (`src/mist/models/cascade.py`, `topology: cascade`; task T6b). The section 8.5 properties are VERIFIED on synthetic 1/f signals (`tests/test_cascade.py`); NOT TESTED on real EEG; no cascade model has been trained on real data yet. Requested by the supervisor on the architecture slide and relayed by the owner. Implementation choices the specification left open are in section 8.8.
 
 ### 8.1 What changed on the diagram
 
@@ -254,3 +254,22 @@ Costs and risks:
 1. Does R -> M mean "morphology within each rhythm band" (adopted), or "rhythm as a conditioning signal for one broadband morphology stream" (`cascade_broad`)?
 2. Should rhythm really have no direct path to the composer? A skip connection is the usual safeguard; it is left out because the arrow was crossed out.
 3. The slide also carried a figure of a 1-D EEG trace with sharp transients. Was that meant as an instruction (for example, morphology should be read from the raw trace), or as an illustration?
+
+### 8.8 Implementation choices (2026-11-23, T6b; docs/DECISION_LOG.md D-010)
+
+The specification in 8.3 leaves these open. Each choice is the simplest reading; none was tuned.
+
+| Item | Choice |
+| --- | --- |
+| Width of `u`, `g_b`, `P_b` | `d_stream` (64), so `u` has the width of one v1 stream |
+| `W_b` "capped residual (8 dims)" | rank-8 map per channel: `e_b` (64) -> 8 -> 64 (`morph_residual`) |
+| Band edges on the bin grid | lower edge inclusive, upper exclusive, except beta which keeps 35 Hz. Every in-band bin falls in exactly one band. 1 s tokens: delta 3 bins, theta/alpha/sigma 4, beta 20 |
+| `destroy_bands: [b]` | randomises the phase of band b's bins **in every channel**, the band channel and the broadband channel, so the band's shape is removed from the whole model. `broad` randomises the broadband channel's whole input and leaves the band channels intact (measures reliance on cross-band alignment) |
+| `knock: [R]` | gates replaced by a running mean of the training gates (EMA, momentum 0.01, stored in the checkpoint) |
+| `knock: [M]` | zeroes `u`; since rhythm reaches the composer only through `u`, this also removes rhythm (the switches are not independent, as 8.5 says) |
+| Critic | one linear critic shared by all channels, applied to `e_b` (which includes the band embedding); real channel waveform vs the same channel built from random phase; mean BCE over channels |
+| Stream dropout | applied to the gain embedding and to `u`, as v1 does per stream |
+| Slot indices for `knock_slots` and galleries | flattened as channel x 16 + slot; renormalised within each channel |
+
+Measured on synthetic 1/f nights (tests/test_cascade.py, smooth zero-phase tilt and bump responses): relative change of G <= 0.005, R <= 0.008, band waveforms <= 0.006 overall and <= 0.012 for the worst channel (delta). Parameter counts with base.yaml: `cascade` = `cascade_placebo` = 699,337; `cascade_bands` 684,745; `cascade_broad` 626,377; `grm` 624,601.
+

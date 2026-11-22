@@ -63,3 +63,10 @@ Decisions taken by Claude Code while the owner is offline (delegation of 2026-11
 
 ### 2026-11-23 - D-009: G0b evaluation shared with E0 seed 0
 - **Chosen:** G0b was evaluated once with scripts/evaluate.py defaults on runs/cw_attnsleep_sqrt_inv_cv*_s0. E0 seed 0 links to the same run folders, so E0 reads the same eval files instead of recomputing them. No score was looked at before the recipe was frozen (commit 630371d precedes the evaluation).
+
+### 2026-11-23 - D-010: cascade implementation details (T6b)
+- **Came up:** A docs-only commit from another session (175911e, 2026-11-22) recorded D7 = cascade (owner relaying the supervisor) and added task T6b. ARCHITECTURE 8.3 leaves several details open.
+- **Chosen:** the simplest reading of each, listed in ARCHITECTURE section 8.8. The one with consequences for results: `destroy_bands: [b]` randomises band b's phase in every channel (band and broadband), so it removes that band's shape from the whole model; the alternative (band channel only) would let the broadband channel leak the band's shape and understate reliance. `broad` removes only the broadband channel (cross-band alignment).
+- **Not changed:** the parallel path (ScaleBranch), its tests and configs. Existing runs stay valid.
+- **Order of work:** E0 (raw, attnsleep) runs unchanged on the GPU while T6b was implemented; the cascade and grm timing runs follow E0 so timings are not distorted by a shared GPU.
+- **Reversible:** yes; no cascade result exists yet.

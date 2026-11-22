@@ -57,6 +57,11 @@ class MistConfig:
     allpass_rad: float = 0.0
     diversity_weight: float = 0.01
     critic_stages: tuple | None = None            # T9: critic only on tokens of epochs with these training labels
+    # topology (ARCHITECTURE section 8): "parallel" = v1 (G, R, M each reach the composer);
+    # "cascade" = rhythm gates per-band morphology, only G and gated M reach the composer
+    topology: str = "parallel"
+    cascade_channels: str = "all"                 # all = 5 bands + broadband | bands | broad
+    band_slots: int = 16                          # shape slots per cascade channel
     extra: dict = field(default_factory=dict)
 
 
@@ -259,7 +264,13 @@ class MistGRM(nn.Module):
     def __init__(self, cfg: MistConfig):
         super().__init__()
         self.cfg = cfg
-        self.branches = nn.ModuleList([ScaleBranch(cfg, w, h) for w, h in cfg.scales])
+        if cfg.topology == "cascade":
+            from .cascade import CascadeBranch as Branch
+        elif cfg.topology == "parallel":
+            Branch = ScaleBranch
+        else:
+            raise ValueError(f"unknown topology {cfg.topology!r}")
+        self.branches = nn.ModuleList([Branch(cfg, w, h) for w, h in cfg.scales])
         self.fuse = nn.Sequential(nn.Linear(cfg.d_token * len(cfg.scales), cfg.d_epoch), nn.GELU(),
                                   nn.Dropout(cfg.dropout))
         self.pos = nn.Parameter(torch.zeros(1, cfg.seq_len, cfg.d_epoch))
@@ -274,20 +285,26 @@ class MistGRM(nn.Module):
     def stat_keys(self):
         return [f"s{i}" for i in range(len(self.branches))]
 
-    def forward(self, x, stats, knock=(), destroy_prob: float | None = None, gen=None, knock_slots=(), y=None):
+    def forward(self, x, stats, knock=(), destroy_prob: float | None = None, gen=None, knock_slots=(), y=None,
+                destroy_bands=()):
         """x: [B, L, T] in microvolt. stats: {"night": {...}, "s0": {...}, ...} from data.dataset.
 
         knock: streams zeroed at inference, e.g. ("M",). destroy_prob overrides
         the config value, e.g. 1.0 at test time measures morphology reliance.
         """
         knock, knock_slots = frozenset(knock), frozenset(knock_slots)
+        extra = {}
+        if destroy_bands:
+            if self.cfg.topology != "cascade":
+                raise ValueError("destroy_bands needs the cascade topology")
+            extra["destroy_bands"] = tuple(destroy_bands)
         dp = self.cfg.destroy_prob if destroy_prob is None else destroy_prob
         outs, aux = [], {"assign": [], "losses": {}}
         scale = stats["night"]["scale"].view(-1, 1, 1)
         xraw = x / scale
         xw = whiten(x, stats["night"]["envelope"], self.cfg.fs) if self.cfg.night_relative else x / 50.0
         for i, br in enumerate(self.branches):
-            h, a = br(xw, xraw, stats[f"s{i}"], knock, dp, gen, knock_slots=knock_slots, y=y)
+            h, a = br(xw, xraw, stats[f"s{i}"], knock, dp, gen, knock_slots=knock_slots, y=y, **extra)
             outs.append(h)
             if "assign" in a:
                 aux["assign"].append(a["assign"])
