@@ -1,0 +1,16 @@
+# Copy to configs/paths.yaml (git-ignored) and edit. Paths below are the ones
+# recorded in the old Proto-sleep repository for the FA006 workstation; they
+# have not been checked from here.
+raw:
+  sleep_cassette:  "/home/FA006/Desktop/Sleep_dl/SLeep_edf_fulldataset/physionet.org/files/sleep-edfx/1.0.0/sleep-cassette"
+  sleep_telemetry: "/home/FA006/Desktop/Sleep_dl/SLeep_edf_fulldataset/physionet.org/files/sleep-edfx/1.0.0/sleep-telemetry"
+  sc_subjects_xls: "/home/FA006/Desktop/Sleep_dl/SLeep_edf_fulldataset/physionet.org/files/sleep-edfx/1.0.0/SC-subjects.xls"
+  st_subjects_xls: "/home/FA006/Desktop/Sleep_dl/SLeep_edf_fulldataset/physionet.org/files/sleep-edfx/1.0.0/ST-subjects.xls"
+# canonical store written by scripts/prepare_sleepedf.py (needs roughly 12 GB for SC + ST, both channels)
+store_root: "/home/FA006/Desktop/Dimension/dataset/mist_store"
+# legacy trimmed NPZ folders: smoke tests and baseline sanity checks only
+legacy:
+  edf20_fpzcz_npz: "/home/FA006/Desktop/Dimension/dataset/Preprocessed Sleep-EDF-20 dataset"
+  edf78_fpzcz_npz: "/home/FA006/Desktop/Dimension/dataset/Preprocessed Sleep-EDF-78 dataset"
+  edf_pzoz_npz:    "/home/FA006/Desktop/Dimension/dataset/Preprocessed_Sleep-EDF_PzOz_npz"
+runs_root: "runs"

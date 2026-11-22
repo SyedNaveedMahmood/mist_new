@@ -1,0 +1,2 @@
+# Spectrum-only model: time-resolved rhythm plus night-relative gain. No access to phase.
+model: {streams: [G, R]}

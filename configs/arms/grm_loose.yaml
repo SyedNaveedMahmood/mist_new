@@ -1,0 +1,2 @@
+# Ablation: morphology stream sees the unit-gain waveform, spectrum included.
+model: {streams: [G, R, M], morph_input: unit_raw, critic_weight: 0.3, allpass_rad: 0.5}

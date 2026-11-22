@@ -1,0 +1,2 @@
+# Unfactorised control: same tokeniser, composer and context, raw waveform tokens.
+model: {streams: [X]}

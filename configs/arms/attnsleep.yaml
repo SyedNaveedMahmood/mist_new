@@ -1,0 +1,2 @@
+# Baseline. Single-epoch model; scales are only used for the night statistics.
+model: {name: attnsleep}

@@ -1,0 +1,20 @@
+# One entry per training or evaluation run that any write-up may cite.
+# Append only. Never edit an old entry; add a correction entry that points to it.
+#
+# - id: e0_attnsleep_cv0_s0
+#   date: 2026-12-01
+#   commit: <git sha>
+#   arm: attnsleep
+#   overrides: {split.fold: 0, train.seed: 0}
+#   split_file: splits/sleepedf_v1.json
+#   protocol: cv
+#   train_channel: Fpz-Cz
+#   evals: [runs/e0_attnsleep_cv0_s0/eval_test_cv_Fpz-Cz.json]
+#   status: VERIFIED | CONDITIONAL | BLOCKED | UNKNOWN | NOT TESTED
+#   note: one line, including anything odd
+runs: []
+
+datasets:
+  sleep-edfx: {licence: "ODC Attribution 1.0", status: VERIFIED, note: "licence read from PhysioNet page 2026-11-18"}
+  hmc: {licence: "CC BY 4.0 (AWS open-data registry)", status: CONDITIONAL, note: "not downloaded"}
+  dreams: {licence: UNKNOWN, status: BLOCKED, note: "read the Zenodo record before any use"}

@@ -1,0 +1,2 @@
+# Full model: gain + rhythm + morphology, morphology critic on.
+model: {streams: [G, R, M], morph_input: phase_only, critic_weight: 0.3, allpass_rad: 0.5}

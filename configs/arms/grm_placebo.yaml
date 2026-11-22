@@ -1,0 +1,2 @@
+# Capacity-matched placebo: the M stream only ever sees random phase.
+model: {streams: [G, R, M], morph_input: phase_only, destroy_prob: 1.0, critic_weight: 0.0}

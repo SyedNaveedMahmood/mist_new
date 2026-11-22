@@ -1,0 +1,29 @@
+# Shared defaults. Arms in configs/arms/ override the `model` block.
+data:
+  cohort: SC
+  channel: "Fpz-Cz"
+  view: std            # std = literature trim (label-conditioned); full = every epoch
+  seq_len: 20
+  windows_per_night: 64
+split:
+  file: splits/sleepedf_v1.json
+  protocol: cv         # cv | young2old | old2young | sc2st | lockbox
+  fold: 0
+train:
+  seed: 0
+  epochs: 40
+  patience: 8
+  batch_size: 32
+  lr: 1.0e-3
+  weight_decay: 1.0e-2
+  grad_clip: 1.0
+  label_smoothing: 0.0
+  class_weight: null   # null | sqrt_inv
+  n1_weight: null      # E4 control arm: extra loss weight on N1
+  num_workers: 4
+model:
+  name: mist_grm
+  scales: [[1.0, 0.5], [4.0, 2.0]]
+  f_lo: 0.5
+  f_hi: 35.0
+  seq_len: 20

@@ -1,0 +1,1 @@
+`sleepedf_v1.json` is created once by `scripts/make_splits.py` after decision D1 (docs/DECISIONS.md) and then committed. It is never regenerated. A new split means a new file name and a new registry section.

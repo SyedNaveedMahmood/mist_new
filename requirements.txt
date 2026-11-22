@@ -1,0 +1,10 @@
+numpy
+scipy
+torch>=2.1
+pyyaml
+scikit-learn
+pandas
+mne>=1.6
+xlrd>=2.0
+pytest
+edfio

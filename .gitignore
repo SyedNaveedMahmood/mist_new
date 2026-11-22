@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.venv/
+# never commit data, checkpoints or per-epoch outputs
+/data/
+/runs/
+*.npy
+*.npz
+*.edf
+*.pt
+*.ckpt
+configs/paths.yaml
