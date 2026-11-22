@@ -136,3 +136,41 @@ def read_st_subjects(xls: Path) -> dict:
             out[(int(r[0]), int(r[c_night]))] = {"age": int(r[1]), "sex": sex,
                                                  "lights_off": str(r[c_lo]), "condition": cond}
     return out
+
+
+def psg_start_hms(psg: Path) -> str:
+    """Start time of day from the fixed EDF header (bytes 176-184, "hh.mm.ss")."""
+    with Path(psg).open("rb") as f:
+        b = f.read(184)
+    return b[176:184].decode("ascii").replace(".", ":")
+
+
+def lights_off_epoch(start_hms: str, lights_off_hms: str) -> int:
+    """Epoch index of lights-off, counted from the PSG start; may be slightly negative.
+
+    The sheets give clock times without a date. Lights-off is taken as the first
+    occurrence after the start, unless that is more than 20 h away, in which case
+    it fell just before the start (ST recordings start at lights-off, and the
+    sheet's minute resolution can put it up to a minute earlier).
+    """
+    sec = lambda s: sum(int(float(v)) * m for v, m in zip(str(s).split(":"), (3600, 60, 1)))
+    d = (sec(lights_off_hms) - sec(start_hms)) % 86400
+    if d > 20 * 3600:
+        d -= 86400
+    return int(d // 30)
+
+
+def window_meta(start_hms: str, lights_off_hms, y) -> dict:
+    """Fields stored per night for the label-free `lf` view and the std/lf epoch counts."""
+    from .store import lf_slice, std_slice
+
+    out = {"psg_start": start_hms, "lights_off_epoch": None, "n_epochs_std": None, "n_epochs_lf": None,
+           "lf_clipped_start": None, "lf_clipped_end": None}
+    sl = std_slice(y)
+    out["n_epochs_std"] = sl.stop - sl.start
+    if lights_off_hms not in (None, "", "nan"):
+        lo = lights_off_epoch(start_hms, lights_off_hms)
+        sl = lf_slice(lo, len(y))
+        out.update(lights_off_epoch=lo, n_epochs_lf=sl.stop - sl.start,
+                   lf_clipped_start=sl.start > lo - 60, lf_clipped_end=sl.stop < lo - 60 + 1200)
+    return out

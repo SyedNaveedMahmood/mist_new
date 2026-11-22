@@ -40,6 +40,7 @@ def main():
             x, y, chans = E.read_recording(psg, hyp)
             meta = {**info, "channels": chans, "psg": psg.name, "hyp": hyp.name,
                     **demo[cohort].get((info["subject_num"], info["night"]), {"age": None, "sex": None})}
+            meta.update(E.window_meta(E.psg_start_hms(psg), meta.get("lights_off"), y))
             save_night(root, cohort, info["record_id"], x, y, meta)
             manifest[info["record_id"]] = {**meta, "n_epochs": int(len(y)), "counts": stage_counts(y)}
             totals["recordings"] += 1; totals["epochs"] += int(len(y)); totals["scored"] += int((y >= 0).sum())

@@ -9,7 +9,7 @@ Work top to bottom. Each task has an acceptance test. Do not start a task whose 
 - [x] **T2 Freeze splits.** Only after decision D1 is confirmed by the owner. `python scripts/make_splits.py`, commit `splits/sleepedf_v1.json`. *Accept:* 20 lockbox, 54 dev, 5 folds of 10 or 11, three age sets, 22 ST; file committed; never regenerated.
 - [ ] **T3 Baseline sanity and timing.** Train `attnsleep` and `raw` on fold 0, seed 0. Record wall time per epoch and GPU memory. *Accept (G0b):* `attnsleep` test macro-F1 >= 0.70 on the `std` view. Write the timing into EXPERIMENT_PLAN section 6 and trim the budget if needed.
 - [x] **T4 Real-data invariance.** `python scripts/check_invariance.py --n-nights 10`. *Accept:* table saved under `runs/e5a/`; gain change 0; tilt change of G, R, M below 0.05; report the all-pass figures as they are.
-- [ ] **T5 Label-free window.** Add a `lf` view: from 30 minutes before lights-off for 10 hours, from the subject spreadsheets. *Accept:* unit test; `lf` and `std` epoch counts per night written to the manifest.
+- [x] **T5 Label-free window.** Add a `lf` view: from 30 minutes before lights-off for 10 hours, from the subject spreadsheets. *Accept:* unit test; `lf` and `std` epoch counts per night written to the manifest.
 
 ## Phase 1b: experiments
 

@@ -12,6 +12,9 @@ Every complete physical 30-s epoch is kept. Views are masks computed on load:
     std   30 min of wake kept before the first and after the last sleep epoch.
           This is the literature convention; it uses stage labels, so it is
           flagged label-conditioned. See docs/EXPERIMENT_PLAN.md, section 4.
+    lf    label-free: from 30 min before lights-off (subject spreadsheets) for
+          10 h, clipped to the recording. ST recordings start at lights-off and
+          last 7.5 to 10.7 h, so for ST the window is mostly the whole recording.
 """
 from __future__ import annotations
 
@@ -44,11 +47,35 @@ class Night:
         if view == "full":
             return slice(0, len(self.y))
         if view == "std":
-            sleep = np.flatnonzero((self.y > 0))
-            if sleep.size == 0:
-                return slice(0, len(self.y))
-            return slice(max(0, sleep[0] - 60), min(len(self.y), sleep[-1] + 61))
+            return std_slice(self.y)
+        if view == "lf":
+            lo = self.meta.get("lights_off_epoch")
+            if lo is None:
+                raise ValueError(f"{self.record_id}: no lights_off_epoch in meta; run scripts/add_lf_window.py")
+            return lf_slice(int(lo), len(self.y))
         raise ValueError(view)
+
+
+LF_BEFORE_EPOCHS = 60       # 30 min before lights-off
+LF_LENGTH_EPOCHS = 1200     # 10 h
+
+
+def std_slice(y) -> slice:
+    """Label-conditioned trim: 30 min of wake either side of the sleep period."""
+    y = np.asarray(y)
+    sleep = np.flatnonzero(y > 0)
+    if sleep.size == 0:
+        return slice(0, len(y))
+    return slice(max(0, int(sleep[0]) - 60), min(len(y), int(sleep[-1]) + 61))
+
+
+def lf_slice(lights_off_epoch: int, n_epochs: int) -> slice:
+    """Label-free window: 30 min before lights-off, 10 h long, clipped to the recording."""
+    start = lights_off_epoch - LF_BEFORE_EPOCHS
+    a, b = max(0, start), min(n_epochs, start + LF_LENGTH_EPOCHS)
+    if b <= a:
+        raise ValueError(f"lf window [{start}, {start + LF_LENGTH_EPOCHS}) misses a recording of {n_epochs} epochs")
+    return slice(a, b)
 
 
 def save_night(root: Path, cohort: str, record_id: str, x: np.ndarray, y: np.ndarray, meta: dict) -> Path:

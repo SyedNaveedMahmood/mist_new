@@ -27,3 +27,8 @@ Decisions taken by Claude Code while the owner is offline (delegation of 2026-11
 - **Chosen:** Same formula and constants (mu = 1.5, 2, 1.5, 1, 1.5 over K), counts from the training subjects of each fold only.
 - **Why:** Avoids test information; the difference in weights is tiny.
 - **Reversible:** yes.
+
+### 2026-11-22 - D-003: where the short `lf` nights are listed
+- **Came up:** The owner asked for the lf counts and the two short SC nights "in the manifest". The manifest is a dict of records; a top-level list would break code that iterates its values.
+- **Chosen:** per-record fields `n_epochs_std`, `n_epochs_lf`, `lf_clipped_start`, `lf_clipped_end` in manifest.json and meta.json, plus `<store>/lf_window_report.json` listing clipped nights (SC: SC4492, SC4592 end early; ST: 42 of 44 end before the 10 h window, 41 start at lights-off so the 30 min lead-in is missing).
+- **Reversible:** yes (backfill script is idempotent).
