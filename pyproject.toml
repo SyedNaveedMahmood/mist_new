@@ -10,7 +10,7 @@ requires-python = ">=3.10"
 dependencies = ["numpy", "scipy", "torch>=2.1", "pyyaml", "scikit-learn", "pandas"]
 
 [project.optional-dependencies]
-data = ["mne>=1.6", "xlrd>=2.0"]
+data = ["mne>=1.6", "xlrd>=2.0", "h5py>=3.8"]
 dev = ["pytest", "edfio", "openpyxl"]
 
 [tool.setuptools.packages.find]
