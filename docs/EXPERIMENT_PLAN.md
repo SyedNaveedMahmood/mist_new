@@ -48,7 +48,9 @@ Frozen once by `scripts/make_splits.py` (seed 20261122) into `splits/sleepedf_v1
 | Dev | The other 54 eligible SC people (19 historical + 35 newly released) | 5 age-balanced folds; all development |
 | ST | All 22 ST people | Cohort-shift target, development grade (already exposed in earlier work) |
 
-This releases 35 previously reserved people. It is decision D1 in docs/DECISIONS.md and needs the owner's confirmation before `make_splits.py` is run.
+This releases 35 previously reserved people. It is decision D1 in docs/DECISIONS.md (confirmed by the owner 2026-11-22; splits frozen in T2).
+
+**Lockbox age range.** The frozen lockbox covers ages 50 to 101 only, because everyone under 50 in SC (persons 00 to 19, ages 25 to 34) was used in earlier development and is not eligible. E6 therefore confirms results on older adults only; say so wherever E6 is reported.
 
 | Protocol | Train / validate | Test | Shift | Oracle for the gap |
 | --- | --- | --- | --- | --- |

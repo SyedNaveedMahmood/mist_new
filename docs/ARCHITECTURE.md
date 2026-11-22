@@ -84,6 +84,16 @@ Measured on synthetic 1/f noise (`scripts/sanity_phase_only.py`, 200 epochs, 1 s
 | zero-phase smooth response | 0.005 | 0.008 | 0.005 | 0.172 |
 | all-pass, quadratic phase (1.5 rad at 35 Hz) | 0.058 | 0.090 | 0.659 | 0.102 |
 
+Measured on real Sleep-EDF nights (`scripts/check_invariance.py --n-nights 10`, task T4, 2026-11-22; first 10 dev nights, SC 00-05, `std` view, 1 s tokens; mean over nights, max in brackets; tables in `runs/e5a/`, registry `e5a_invariance_10n`):
+
+| Nuisance applied to the whole night | Fpz-Cz G | R | M | Pz-Oz G | R | M |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| gain x3 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 | 0.000 |
+| zero-phase tilt f^-0.5 | 0.003 (0.003) | 0.007 (0.007) | 0.006 (0.006) | 0.002 (0.003) | 0.007 (0.008) | 0.006 (0.006) |
+| all-pass, quadratic phase (1.5 rad at 35 Hz) | 0.035 (0.038) | 0.081 (0.083) | 0.659 (0.660) | 0.030 (0.042) | 0.080 (0.085) | 0.659 (0.660) |
+
+A dispersive (all-pass) filter applied to the signal moves energy between neighbouring tokens, so G and R change slightly (about 0.03 and 0.08 on real nights, 0.06 and 0.09 on synthetic) even though each token's code ignores its own phase.
+
 Reading: magnitude-type nuisances are removed almost completely. **Phase-type nuisances are not, and they hit M harder than they hit raw tokens.** That is the main technical risk of the design (section 6).
 
 ### What does not hold
