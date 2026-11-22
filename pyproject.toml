@@ -11,7 +11,7 @@ dependencies = ["numpy", "scipy", "torch>=2.1", "pyyaml", "scikit-learn", "panda
 
 [project.optional-dependencies]
 data = ["mne>=1.6", "xlrd>=2.0"]
-dev = ["pytest", "edfio"]
+dev = ["pytest", "edfio", "openpyxl"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

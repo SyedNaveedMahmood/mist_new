@@ -26,7 +26,10 @@ def main():
     a = ap.parse_args()
     paths = load_paths(a.paths)
     root = Path(paths["store_root"])
-    ages = E.read_sc_subjects(Path(paths["raw"]["sc_subjects_xls"])) if "SC" in a.cohorts else {}
+    # keyed by cohort: SC and ST reuse subject numbers, so one shared dict would
+    # give ST records the demographics of the SC person with the same number
+    demo = {"SC": E.read_sc_subjects(Path(paths["raw"]["sc_subjects_xls"])) if "SC" in a.cohorts else {},
+            "ST": E.read_st_subjects(Path(paths["raw"]["st_subjects_xls"])) if "ST" in a.cohorts else {}}
     manifest, totals = {}, {"recordings": 0, "epochs": 0, "scored": 0}
     for cohort in a.cohorts:
         folder = Path(paths["raw"]["sleep_cassette" if cohort == "SC" else "sleep_telemetry"])
@@ -36,7 +39,7 @@ def main():
                 continue
             x, y, chans = E.read_recording(psg, hyp)
             meta = {**info, "channels": chans, "psg": psg.name, "hyp": hyp.name,
-                    **ages.get((info["subject_num"], info["night"]), {"age": None, "sex": None})}
+                    **demo[cohort].get((info["subject_num"], info["night"]), {"age": None, "sex": None})}
             save_night(root, cohort, info["record_id"], x, y, meta)
             manifest[info["record_id"]] = {**meta, "n_epochs": int(len(y)), "counts": stage_counts(y)}
             totals["recordings"] += 1; totals["epochs"] += int(len(y)); totals["scored"] += int((y >= 0).sum())

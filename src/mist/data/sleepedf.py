@@ -108,3 +108,27 @@ def read_sc_subjects(xls: Path) -> dict:
             "lights_off": None if c_lo is None else str(r[c_lo]),
         }
     return out
+
+
+def read_st_subjects(xls: Path) -> dict:
+    """ST-subjects.xls -> {(subject_num, night): {"age", "sex", "lights_off", "condition"}}.
+
+    Layout checked against the real file (T1, 2026-11-22): two header rows, then
+    columns Nr | Age | M1/F2 | placebo night nr | lights off | temazepam night nr | lights off.
+    Sex is coded M=1, F=2 here, the opposite of SC-subjects.xls (F=1).
+    """
+    import pandas as pd
+
+    df = pd.read_excel(xls, header=None)
+    head = " ".join(str(v) for v in df.iloc[:2].to_numpy().ravel()).lower()
+    if not ("placebo" in head and "temazepam" in head and "m1/f2" in head):
+        raise ValueError(f"unrecognised ST-subjects layout: {df.iloc[:2].to_numpy().tolist()}")
+    out = {}
+    for r in df.iloc[2:].itertuples(index=False):
+        if pd.isna(r[0]):
+            continue
+        sex = {1: "M", 2: "F"}[int(r[2])]
+        for c_night, c_lo, cond in ((3, 4, "placebo"), (5, 6, "temazepam")):
+            out[(int(r[0]), int(r[c_night]))] = {"age": int(r[1]), "sex": sex,
+                                                 "lights_off": str(r[c_lo]), "condition": cond}
+    return out
