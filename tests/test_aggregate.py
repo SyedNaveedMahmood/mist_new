@@ -41,3 +41,12 @@ def test_paired_diff_zero_for_identical_and_signed_for_worse():
     r = paired_diff(a, worse, n_boot=300)
     assert r["mf1"]["diff"] > 0 and r["mf1"]["lo"] > 0
     assert summary(a)["n_subjects"] == 12
+
+
+def test_non_n1_sum_and_restrict():
+    from mist.aggregate import restrict
+    rng = np.random.default_rng(3)
+    cm = rand_cm(rng)
+    sc = metrics.scores(cm)
+    assert abs(float(scores_batch(cm)["f1_nonN1_sum"]) - (sc["f1_W"] + sc["f1_N2"] + sc["f1_N3"] + sc["f1_REM"])) < 1e-12
+    assert list(restrict({"a": 1, "b": 2}, ["b"])) == ["b"]

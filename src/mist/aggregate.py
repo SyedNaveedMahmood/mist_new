@@ -13,7 +13,7 @@ import numpy as np
 
 from . import STAGES
 
-METRICS = ("mf1", "acc", "kappa") + tuple(f"f1_{s}" for s in STAGES)
+METRICS = ("mf1", "acc", "kappa") + tuple(f"f1_{s}" for s in STAGES) + ("f1_nonN1_sum",)
 
 
 def collect(paths, cell: str, nights: set | None = None) -> dict:
@@ -45,6 +45,7 @@ def scores_batch(cm: np.ndarray) -> dict:
     pe = (cm.sum(-2) * cm.sum(-1)).sum(-1) / np.maximum(n * n, 1)
     out = {"mf1": np.nanmean(f1, -1), "acc": po, "kappa": (po - pe) / np.maximum(1 - pe, 1e-12)}
     out.update({f"f1_{s}": f1[..., i] for i, s in enumerate(STAGES)})
+    out["f1_nonN1_sum"] = f1[..., [0, 2, 3, 4]].sum(-1)          # H5: summed F1 of W, N2, N3, REM
     return out
 
 
@@ -71,3 +72,9 @@ def paired_diff(cms_a: dict, cms_b: dict, n_boot: int = 10000, seed: int = 0) ->
         out[k] = {"diff": point[k], "lo": float(lo), "hi": float(hi)}
     out["n_subjects"] = len(subs)
     return out
+
+
+def restrict(cms: dict, subjects) -> dict:
+    """Keep only the given subjects (e.g. the old age band inside cv results)."""
+    subjects = set(subjects)
+    return {k: v for k, v in cms.items() if k in subjects}
