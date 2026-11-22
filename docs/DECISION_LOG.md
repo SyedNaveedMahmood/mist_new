@@ -32,3 +32,19 @@ Decisions taken by Claude Code while the owner is offline (delegation of 2026-11
 - **Came up:** The owner asked for the lf counts and the two short SC nights "in the manifest". The manifest is a dict of records; a top-level list would break code that iterates its values.
 - **Chosen:** per-record fields `n_epochs_std`, `n_epochs_lf`, `lf_clipped_start`, `lf_clipped_end` in manifest.json and meta.json, plus `<store>/lf_window_report.json` listing clipped nights (SC: SC4492, SC4592 end early; ST: 42 of 44 end before the 10 h window, 41 start at lights-off so the 30 min lead-in is missing).
 - **Reversible:** yes (backfill script is idempotent).
+
+### 2026-11-22 - D-004: how seeds and folds are combined in E0 tables
+- **Came up:** EXPERIMENT_PLAN section 7 asks for the bootstrap "on seed-averaged predictions"; evaluation files hold argmax confusion matrices, not probabilities.
+- **Options:** (a) re-run evaluation saving probabilities and average them; (b) sum each subject's confusion matrices over seeds (and over folds for sc2st, where every ST person is tested by all 5 fold models) and resample subjects.
+- **Chosen:** (b). Each seed counts equally, the resampling unit stays the person, and no extra evaluation pass is needed. It does not reduce prediction noise the way probability averaging would, so intervals are, if anything, slightly wider (conservative).
+- **Reversible:** yes (probabilities can be added to evaluate.py later).
+
+### 2026-11-22 - D-005: exact G1 rule
+- **Came up:** EXPERIMENT_PLAN gives G1 as "local_phase costs less than 1 macro-F1 point for every stage and every model" and H0 as "MR >= 1 point for at least one stage, interval excluding 0", without saying which protocol decides.
+- **Chosen:** G1 passes iff, **in-domain** (cv, Fpz-Cz, std), at least one of raw / attnsleep has at least one stage whose F1 drops by >= 1 point under `local_phase` with the 95% paired-bootstrap interval excluding 0. Montage, sc2st and lf results are reported in reports/e0.md but do not decide the gate.
+- **Why:** Combines both written criteria (size and interval); deciding on one pre-named protocol avoids passing by searching across protocols (conservative).
+- **Reversible:** the tables for every protocol are kept.
+
+### 2026-11-22 - D-006: E0 scope
+- **Chosen:** E0 = raw and attnsleep under `cv`, evaluated in-domain, Pz-Oz (montage) and sc2st (all ST nights, then placebo and temazepam nights separately), plus the lf window for in-domain and sc2st as sensitivity. The age-shift protocols need separate training and are covered in E1, not E0 (the owner's T6 list names only in-domain, Pz-Oz and sc2st).
+- **Seed 0** of E0 reuses the recipe-sweep runs whose class-weight setting is selected, because their configuration is identical to the frozen recipe; seeds 1 and 2 are trained new.
