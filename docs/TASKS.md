@@ -16,7 +16,7 @@ Work top to bottom. Each task has an acceptance test. Do not start a task whose 
 - [ ] **T6 E0 audit.** 30 runs, then `scripts/evaluate.py` for in-domain, `--channel Pz-Oz`, `--protocol sc2st`. Write `scripts/aggregate.py` to build the condition x stage tables with subject-bootstrap intervals. *Accept:* tables in `reports/e0.md`; gate G1 decided and recorded.
 - [ ] **T7 E1 factor arms.** As EXPERIMENT_PLAN section 5. *Accept:* `reports/e1.md` with every decisive pair from section 1; gates G2 and G3 decided.
 - [ ] **T8 Slot knockouts.** Add `knock_slots` to `ScaleBranch.forward` (zero the chosen assignments and renormalise), a slot gallery (top-activating tokens as waveforms), and after-the-fact naming by agreement with relative-threshold spindle, slow-wave and alpha detectors. *Accept:* unit test that knocking all slots equals `knock_M` up to the residual; gallery for one checkpoint.
-- [ ] **T9 Stage-targeted critic.** Config `critic_stages: [0, 1, 4]` restricts the critic to tokens from those stages (training labels only). *Accept:* unit test; used by E4 arm N-target.
+- [x] **T9 Stage-targeted critic.** Config `critic_stages: [0, 1, 4]` restricts the critic to tokens from those stages (training labels only). *Accept:* unit test; used by E4 arm N-target.
 - [ ] **T10 E2, E3, E4, E5.** *Accept:* `reports/e2.md` to `e5.md`; the mixed model for H1; Holm-corrected table of H1 to H6.
 - [ ] **T11 Freeze.** Write the final hyperparameters and analysis script hash into the registry. *Accept:* owner signs off in `docs/DECISIONS.md`.
 - [ ] **T12 E6 lockbox.** One evaluation with `split.i_am_running_the_final_confirmation=true`. *Accept:* result reported unchanged, whatever it is.

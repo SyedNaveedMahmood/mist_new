@@ -121,7 +121,7 @@ def train(cfg: dict, paths: dict, out_dir: Path) -> dict:
         t0, tot, n = time.time(), 0.0, 0
         for batch in loader:
             x, y = batch["x"].float().to(device), batch["y"].to(device)
-            logits, aux = model(x, split_stats(batch, device))
+            logits, aux = model(x, split_stats(batch, device), y=y)   # y: only the T9 critic mask reads it
             loss = F.cross_entropy(logits.reshape(-1, 5), y.reshape(-1), weight=weight, ignore_index=-1,
                                    label_smoothing=t.get("label_smoothing", 0.0))
             loss = loss + model.aux_loss(aux)

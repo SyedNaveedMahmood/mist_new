@@ -30,6 +30,8 @@ def build_model(cfg: dict) -> nn.Module:
     if name == "mist_grm":
         cfg["streams"] = tuple(cfg.get("streams", ("G", "R", "M")))
         cfg["scales"] = tuple(tuple(s) for s in cfg.get("scales", ((1.0, 0.5), (4.0, 2.0))))
+        if cfg.get("critic_stages") is not None:
+            cfg["critic_stages"] = tuple(int(v) for v in cfg["critic_stages"])
         return MistGRM(MistConfig(**cfg))
     if name == "attnsleep":
         from .attnsleep import AttnSleepBaseline, init_attnsleep_weights

@@ -56,6 +56,7 @@ class MistConfig:
     critic_frac: float = 0.25
     allpass_rad: float = 0.0
     diversity_weight: float = 0.01
+    critic_stages: tuple | None = None            # T9: critic only on tokens of epochs with these training labels
     extra: dict = field(default_factory=dict)
 
 
@@ -165,8 +166,13 @@ class ScaleBranch(nn.Module):
         self.tok_enc = nn.TransformerEncoder(layer, cfg.token_layers, enable_nested_tensor=False)
         self.pool = AttnPool(cfg.d_token)
 
-    def forward(self, xw, xraw, stats, knock: frozenset, destroy_prob: float, gen=None):
-        """xw: whitened [B, L, T]; xraw: per-night scaled raw [B, L, T]; stats: mag_med, mag_iqr [B, F]."""
+    def forward(self, xw, xraw, stats, knock: frozenset, destroy_prob: float, gen=None,
+                knock_slots: frozenset = frozenset(), y=None):
+        """xw: whitened [B, L, T]; xraw: per-night scaled raw [B, L, T]; stats: mag_med, mag_iqr [B, F].
+
+        knock_slots: shape-slot indices whose assignments are zeroed (the rest renormalised;
+        knocking every slot leaves only the residual). y: training labels [B, L], used only to
+        restrict the critic to `critic_stages`."""
         cfg, fz = self.cfg, self.fz
         B, L, _ = xw.shape
         f = fz.factorize(xw)                                  # leading dims [B, L, N]
@@ -200,11 +206,17 @@ class ScaleBranch(nn.Module):
                 tok = torch.where(kill, fake, real)
             m = self.morph(tok.reshape(-1, fz.win)).view(B, L, N, -1)
             a = self.codebook(m)
+            if knock_slots:
+                keep = torch.ones(a.shape[-1], device=a.device, dtype=a.dtype)
+                keep[list(knock_slots)] = 0
+                a = a * keep
+                tot = a.sum(-1, keepdim=True)
+                a = torch.where(tot > 0, a / tot.clamp_min(1e-12), torch.zeros_like(a))
             aux["assign"] = a
             mp = [a] + ([self.resid(m)] if self.resid is not None else [])
             parts.append(gate("M", torch.cat(mp, -1)))
             if self.training and cfg.critic_weight > 0:
-                aux["critic"] = self._critic_loss(f, ph, real, gen)
+                aux["critic"] = self._critic_loss(f, ph, real, gen, self._critic_mask(y, B, L, N))
         if self.use["X"]:
             raw = fz.tokens(xraw) * fz.window                 # conventional input: scaled raw waveform tokens
             parts.append(gate("X", self.raw(raw.reshape(-1, fz.win)).view(B, L, N, -1)))
@@ -212,12 +224,28 @@ class ScaleBranch(nn.Module):
         h = self.proj(torch.cat(parts, -1)).view(B * L, N, -1) + self.pos
         return self.pool(self.tok_enc(h)).view(B, L, -1), aux
 
-    def _critic_loss(self, f, ph, real, gen):
+    def _critic_mask(self, y, B, L, N):
+        """Token mask [B*L*N] for critic_stages (None = all tokens)."""
+        if self.cfg.critic_stages is None:
+            return None
+        if y is None:
+            raise ValueError("critic_stages needs the training labels y")
+        ok = torch.zeros_like(y, dtype=torch.bool)
+        for st in self.cfg.critic_stages:
+            ok |= y == st
+        return ok.unsqueeze(-1).expand(B, L, N).reshape(-1)
+
+    def _critic_loss(self, f, ph, real, gen, mask=None):
         """Tell real tokens from surrogates with the same magnitude spectrum."""
         fz, cfg = self.fz, self.cfg
         flat_real = real.reshape(-1, fz.win)
-        n = max(8, int(cfg.critic_frac * flat_real.shape[0]))
-        idx = torch.randperm(flat_real.shape[0], device=real.device, generator=gen)[:n]
+        pool = torch.arange(flat_real.shape[0], device=real.device)
+        if mask is not None:
+            pool = pool[mask.to(real.device)]
+            if pool.numel() == 0:
+                return real.sum() * 0.0                       # no eligible token in this batch
+        n = min(pool.numel(), max(8, int(cfg.critic_frac * flat_real.shape[0])))
+        idx = pool[torch.randperm(pool.numel(), device=real.device, generator=gen)[:n]]
         sel = lambda t: t.reshape(-1, t.shape[-1])[idx]
         fake_f = Factors(sel(f.log_mag), fz.random_phasor(sel(ph), gen))
         fake = fz.morph_token(fake_f, cfg.morph_input)
@@ -246,20 +274,20 @@ class MistGRM(nn.Module):
     def stat_keys(self):
         return [f"s{i}" for i in range(len(self.branches))]
 
-    def forward(self, x, stats, knock=(), destroy_prob: float | None = None, gen=None):
+    def forward(self, x, stats, knock=(), destroy_prob: float | None = None, gen=None, knock_slots=(), y=None):
         """x: [B, L, T] in microvolt. stats: {"night": {...}, "s0": {...}, ...} from data.dataset.
 
         knock: streams zeroed at inference, e.g. ("M",). destroy_prob overrides
         the config value, e.g. 1.0 at test time measures morphology reliance.
         """
-        knock = frozenset(knock)
+        knock, knock_slots = frozenset(knock), frozenset(knock_slots)
         dp = self.cfg.destroy_prob if destroy_prob is None else destroy_prob
         outs, aux = [], {"assign": [], "losses": {}}
         scale = stats["night"]["scale"].view(-1, 1, 1)
         xraw = x / scale
         xw = whiten(x, stats["night"]["envelope"], self.cfg.fs) if self.cfg.night_relative else x / 50.0
         for i, br in enumerate(self.branches):
-            h, a = br(xw, xraw, stats[f"s{i}"], knock, dp, gen)
+            h, a = br(xw, xraw, stats[f"s{i}"], knock, dp, gen, knock_slots=knock_slots, y=y)
             outs.append(h)
             if "assign" in a:
                 aux["assign"].append(a["assign"])
