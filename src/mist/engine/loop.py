@@ -100,6 +100,10 @@ def train(cfg: dict, paths: dict, out_dir: Path) -> dict:
     (out_dir / "config.yaml").write_text(yaml.safe_dump(cfg))
     log = (out_dir / "log.jsonl").open("a")
     best, best_epoch, patience = -1.0, -1, t.get("patience", 8)
+    cuda = device.type == "cuda"
+    if cuda:
+        torch.cuda.reset_peak_memory_stats(device)
+    t_start = time.time()
     for ep in range(epochs):
         model.train()
         t0, tot, n = time.time(), 0.0, 0
@@ -117,6 +121,8 @@ def train(cfg: dict, paths: dict, out_dir: Path) -> dict:
         val, _ = evaluate(model, va, device, batch_size=bs)
         rec = {"epoch": ep, "loss": tot / max(n, 1), "val_mf1": val["mf1"], "val_acc": val["acc"],
                "sec": round(time.time() - t0, 1)}
+        if cuda:
+            rec["gpu_peak_mb"] = round(torch.cuda.max_memory_allocated(device) / 2**20)
         log.write(json.dumps(rec) + "\n"); log.flush()
         print(rec)
         if val["mf1"] > best:
@@ -125,6 +131,8 @@ def train(cfg: dict, paths: dict, out_dir: Path) -> dict:
         elif ep - best_epoch >= patience:
             break
     summary = {"best_val_mf1": best, "best_epoch": best_epoch, "params": count_parameters(model),
+               "epochs_run": ep + 1, "wall_sec": round(time.time() - t_start, 1),
+               "gpu_peak_mb": round(torch.cuda.max_memory_allocated(device) / 2**20) if cuda else None,
                "commit": git_commit(), "roles": {k: v for k, v in roles.items()}}
     (out_dir / "train_summary.json").write_text(json.dumps(summary, indent=1))
     return summary
