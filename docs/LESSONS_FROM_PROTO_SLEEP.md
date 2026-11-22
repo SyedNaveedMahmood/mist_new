@@ -10,7 +10,7 @@ Source: `RESEARCH_STATUS_AND_HISTORY.md` on the `main` branch of `SyedNaveedMahm
 | The old NPZ files were trimmed by a label-conditioned rule whose script is unknown | Rebuild from raw EDF; NPZ only for smoke tests |
 | SC persons 06, 23, 36, 74 have unresolved demographic or annotation conflicts | Quarantined by default (`sleepedf.SC_QUARANTINE`) |
 | Audited raw SC subset: 74 people, 146 recordings, 397,832 complete 30-s epochs, 396,378 scored | Gate G0: the new reader must reproduce these totals |
-| Seven ST hypnograms fail strict EDF+ parsing because of a previous-day Recordingfield; all 44 ST pairs were validated | The new reader takes onsets relative to PSG start and must still be checked on those seven files |
+| Seven ST hypnograms fail strict EDF+ parsing because of a previous-day Recordingfield; all 44 ST pairs were validated | Corrected in T1 (2026-11-22): the previous-day Recordingfield is present in both the PSG and the hypnogram of those seven nights (ST7021, ST7071, ST7092, ST7131, ST7132, ST7141, ST7142), which start just after midnight. PSG and hypnogram share the same fixed start date and time in all 197 pairs, and `mne.read_annotations` matches a raw TAL decode, so onsets relative to the file start are correct |
 | ST was used in several exploratory analyses | ST is a development-grade target; never presented as untouched |
 | 55 SC extension people were never used | 20 stay locked; the release of the other 35 is decision D1 |
 | HMC evaluation was blocked by storage (about 15.7 GB needed, 7 GB free), not by access | Free the space; HMC is the first external target |

@@ -1,16 +1,20 @@
 """Sleep-EDF Expanded (cassette SC and telemetry ST) -> canonical store.
 
-STATUS: logic unit-tested on synthetic annotations only. It has NOT been run on
-the real EDF files in this repository's history (PhysioNet was unreachable where
-this was written). Task T1 in docs/TASKS.md verifies it against the audited
-counts from the old Proto-sleep pipeline before anything is trained.
+STATUS: run on the real Sleep-EDF Expanded 1.0.0 files in T1 (2026-11-22); the
+built store reproduces the audited Proto-sleep totals (gate G0): SC 74 people,
+146 recordings, 397,832 epochs, 396,378 scored; ST 22 people, 44 recordings.
 
 Decisions carried over from the Proto-sleep data audit (P1.5 / P2-SC):
   * every complete physical 30-s epoch is kept, with unscored epochs as -1;
   * SC persons 06, 23, 36 and 74 are quarantined by default;
-  * hypnogram onsets are taken relative to the PSG start. The seven ST
-    hypnograms with a previous-day EDF+ Recordingfield were shown there to share
-    the PSG's fixed clock, so no date arithmetic is applied.
+  * hypnogram onsets are taken relative to the file start, with no date
+    arithmetic. Checked on the real files in T1 (2026-11-22): in the seven ST
+    nights ST7021, ST7071, ST7092, ST7131, ST7132, ST7141, ST7142 the
+    previous-day EDF+ Recordingfield ("Startdate" one day before the fixed
+    header date) is present in BOTH the PSG and the hypnogram, because those
+    recordings start just after midnight. In all 197 pairs the PSG and the
+    hypnogram have identical fixed start date and time, and mne.read_annotations
+    agrees with a raw TAL decode, so onsets relative to the file start are correct.
 """
 from __future__ import annotations
 

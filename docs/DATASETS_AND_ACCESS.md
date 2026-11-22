@@ -7,7 +7,7 @@ Checked on 2026-11-22. "Verified" means read from the dataset's own page or regi
 | Dataset | Path recorded in the old repository | Use | Notes |
 | --- | --- | --- | --- |
 | Sleep-EDF cassette, raw EDF | `/home/FA006/Desktop/Sleep_dl/SLeep_edf_fulldataset/physionet.org/files/sleep-edfx/1.0.0/sleep-cassette` | All of phase 1 | Folder name has a capital L in `SLeep`. Licence: Open Data Commons Attribution 1.0 (verified) |
-| Sleep-EDF telemetry, raw EDF | `.../1.0.0/sleep-telemetry` | Cohort-shift target | Seven hypnograms carry a previous-day EDF+ Recordingfield; the old audit validated all 44 pairs |
+| Sleep-EDF telemetry, raw EDF | `.../1.0.0/sleep-telemetry` | Cohort-shift target | Seven nights carry a previous-day EDF+ Recordingfield in both PSG and hypnogram (start just after midnight); onsets relative to file start verified in T1 |
 | `SC-subjects.xls`, `ST-subjects.xls` | `.../1.0.0/` | Age, sex, lights-off | Column layout unverified in code (T1) |
 | Legacy trimmed NPZ (EDF-20, EDF-78, Pz-Oz) | `/home/FA006/Desktop/Dimension/dataset/Preprocessed ...` | Smoke tests only | Trimming rule unknown and label-conditioned |
 
