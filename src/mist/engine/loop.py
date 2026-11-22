@@ -43,11 +43,12 @@ def make_dataset(nights, cfg, channel, train):
 
 
 @torch.no_grad()
-def predict(model, ds, device, condition="real", knock=(), destroy_prob=None, batch_size=32, seed=0):
+def predict(model, ds, device, condition="real", knock=(), destroy_prob=None, batch_size=32, seed=0,
+            return_records=False):
     """Return true labels, predictions and subject ids for every scored epoch of `ds`."""
     model.eval()
     gen = torch.Generator(device="cpu").manual_seed(seed)
-    ys, ps, ss = [], [], []
+    ys, ps, ss, rs = [], [], [], []
     for batch in DataLoader(ds, batch_size=batch_size, shuffle=False):
         x = CONDITIONS[condition](batch["x"].float(), gen).to(device)
         logits, _ = model(x, split_stats(batch, device), knock=knock, destroy_prob=destroy_prob)
@@ -55,13 +56,19 @@ def predict(model, ds, device, condition="real", knock=(), destroy_prob=None, ba
         ys.append(batch["y"].numpy()[keep])
         ps.append(logits.argmax(-1).cpu().numpy()[keep])
         subj = np.array([ds.views[int(i)].night.subject for i in batch["night"]])
+        rec = np.array([ds.views[int(i)].night.record_id for i in batch["night"]])
         ss.append(np.repeat(subj[:, None], keep.shape[1], 1)[keep])
+        rs.append(np.repeat(rec[:, None], keep.shape[1], 1)[keep])
+    if return_records:
+        return np.concatenate(ys), np.concatenate(ps), np.concatenate(ss), np.concatenate(rs)
     return np.concatenate(ys), np.concatenate(ps), np.concatenate(ss)
 
 
-def evaluate(model, ds, device, **kw) -> tuple:
-    y, p, s = predict(model, ds, device, **kw)
+def evaluate(model, ds, device, return_night_cms=False, **kw) -> tuple:
+    y, p, s, r = predict(model, ds, device, return_records=True, **kw)
     cms = metrics.per_subject(y, p, s)
+    if return_night_cms:
+        return metrics.summarize(cms), cms, metrics.per_subject(y, p, r)
     return metrics.summarize(cms), cms
 
 

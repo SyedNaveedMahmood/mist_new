@@ -26,6 +26,7 @@ def main():
     ap.add_argument("--protocol", default=None, help="override the test protocol, e.g. sc2st")
     ap.add_argument("--paths", default="configs/paths.yaml")
     ap.add_argument("--tag", default="test")
+    ap.add_argument("--view", default=None, help="evaluation window; default = training view (std). lf = label-free")
     a = ap.parse_args()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, cfg = load_checkpoint(a.run, device)
@@ -37,19 +38,26 @@ def main():
                          split_file=cfg["split"]["file"],
                          open_lockbox=protocol == "lockbox" and bool(cfg["split"].get("i_am_running_the_final_confirmation")))
     channel = a.channel or cfg["data"]["channel"]
+    if a.view:
+        cfg["data"]["view"] = a.view          # window only; the night reference is recomputed inside it
     ds = make_dataset(nights, cfg, channel, train=False)
     streams = cfg["model"].get("streams", []) if cfg["model"].get("name", "mist_grm") == "mist_grm" else []
     cells = [("real", (), None), ("global_phase", (), None), ("local_phase", (), None), ("flatten_tilt", (), None)]
     cells += [("real", (s,), None) for s in streams if s in "GRM" and len(streams) > 1]
     if "M" in streams:
         cells.append(("real", (), 1.0))
-    out = {"protocol": protocol, "channel": channel, "n_nights": len(nights), "cells": {}}
+    out = {"protocol": protocol, "channel": channel, "n_nights": len(nights), "view": cfg["data"].get("view", "std"),
+           "night_meta": {n.record_id: {"subject": n.subject, "condition": n.meta.get("condition")} for n in nights},
+           "cells": {}}
     for cond, knock, destroy in cells:
         key = cond + ("" if not knock else f"|knock_{''.join(knock)}") + ("" if destroy is None else "|destroy_M")
-        summ, cms = evaluate(model, ds, device, condition=cond, knock=knock, destroy_prob=destroy)
-        out["cells"][key] = {"summary": summ, "subject_cm": {k: v.tolist() for k, v in cms.items()}}
+        summ, cms, ncms = evaluate(model, ds, device, return_night_cms=True, condition=cond, knock=knock,
+                                   destroy_prob=destroy)
+        out["cells"][key] = {"summary": summ, "subject_cm": {k: v.tolist() for k, v in cms.items()},
+                             "night_cm": {k: v.tolist() for k, v in ncms.items()}}
         print(key, {k: round(v, 4) for k, v in summ.items() if k in ("mf1", "acc", "kappa", "f1_N1")})
-    name = f"eval_{a.tag}_{protocol}_{channel}.json"
+    view = cfg["data"].get("view", "std")
+    name = f"eval_{a.tag}_{protocol}_{channel}" + ("" if view == "std" else f"_{view}") + ".json"
     (Path(a.run) / name).write_text(json.dumps(out, indent=1))
 
 
