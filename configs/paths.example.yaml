@@ -11,6 +11,7 @@ store_root: "/home/FA006/Desktop/Dimension/dataset/mist_store"
 # legacy trimmed NPZ folders: smoke tests and baseline sanity checks only
 legacy:
   edf20_fpzcz_npz: "/home/FA006/Desktop/Dimension/dataset/Preprocessed Sleep-EDF-20 dataset"
+  # DO NOT USE: contains lockbox people (owner decision 2026-11-22); load_legacy_npz refuses their files
   edf78_fpzcz_npz: "/home/FA006/Desktop/Dimension/dataset/Preprocessed Sleep-EDF-78 dataset"
   edf_pzoz_npz:    "/home/FA006/Desktop/Dimension/dataset/Preprocessed_Sleep-EDF_PzOz_npz"
 runs_root: "runs"

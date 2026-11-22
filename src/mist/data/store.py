@@ -69,23 +69,58 @@ def load_night(d: Path) -> Night:
                  y=np.load(d / "y.npy"), meta=meta)
 
 
-def load_cohort(root: Path, cohort: str, subjects: set | None = None) -> list:
+DEFAULT_SPLIT = Path(__file__).resolve().parents[3] / "splits" / "sleepedf_v1.json"
+
+
+def subject_of_record(record_id: str) -> str:
+    """'SC4071' -> 'SC:07', 'ST7022' -> 'ST:02' (Sleep-EDF record folder names)."""
+    cohort = {"SC4": "SC", "ST7": "ST"}.get(record_id[:3])
+    if cohort is None or not record_id[3:5].isdigit():
+        raise ValueError(f"not a Sleep-EDF record folder: {record_id}")
+    return f"{cohort}:{int(record_id[3:5]):02d}"
+
+
+def lockbox_subjects(split_file: Path = DEFAULT_SPLIT) -> set:
+    from .splits import load
+    return set(load(split_file)["lockbox"])
+
+
+def load_cohort(root: Path, cohort: str, subjects: set | None = None, *, split_file: Path = DEFAULT_SPLIT,
+                open_lockbox: bool = False) -> list:
+    """Load the nights of one cohort, optionally restricted to `subjects`.
+
+    Lockbox people (read from the frozen split file) are never returned unless
+    open_lockbox=True, which only task T12 may pass. Asking for one explicitly
+    raises; asking for the whole cohort silently leaves them out. Nights are
+    selected by folder name before anything is opened, so lockbox files are not
+    even memory-mapped.
+    """
     base = Path(root) / cohort
     if not base.is_dir():
         raise FileNotFoundError(f"{base} not found; run scripts/prepare_sleepedf.py first")
-    nights = [load_night(p) for p in sorted(base.iterdir()) if (p / "meta.json").exists()]
-    if subjects is not None:
-        nights = [n for n in nights if n.subject in subjects]
+    locked = set() if open_lockbox else lockbox_subjects(split_file)
+    if subjects is not None and set(subjects) & locked:
+        raise PermissionError("lockbox people requested; the lockbox is opened once, by task T12 only")
+    dirs = [p for p in sorted(base.iterdir()) if (p / "meta.json").exists()]
+    keep = [p for p in dirs if subject_of_record(p.name) not in locked
+            and (subjects is None or subject_of_record(p.name) in subjects)]
+    nights = [load_night(p) for p in keep]
+    assert all(n.subject == subject_of_record(p.name) for n, p in zip(nights, keep)), "folder/subject mismatch"
     return nights
 
 
-def load_legacy_npz(path: Path, cohort: str = "SC", channel: str = "Fpz-Cz") -> Night:
+def load_legacy_npz(path: Path, cohort: str = "SC", channel: str = "Fpz-Cz", *,
+                    split_file: Path = DEFAULT_SPLIT) -> Night:
     """Read a DeepSleepNet-style NPZ (keys x, y, fs) from the old Proto-sleep folders.
 
     These files were trimmed with an unknown label-conditioned rule, so they are
     for smoke tests and baseline sanity checks only, never for transfer claims.
+    The Sleep-EDF-78 legacy folder holds lockbox people; their files are refused
+    before they are opened.
     """
     path = Path(path)
+    if f"{cohort}:{int(path.stem[3:5]):02d}" in lockbox_subjects(split_file):
+        raise PermissionError(f"{path.name} belongs to a lockbox person; the lockbox is opened by T12 only")
     with np.load(path, allow_pickle=False) as d:
         x = np.asarray(d["x"], dtype=np.float32).squeeze()
         y = np.asarray(d["y"]).reshape(-1).astype(np.int8)

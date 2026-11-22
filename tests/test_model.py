@@ -76,7 +76,7 @@ def test_end_to_end_training_learns_synthetic_stages(store, tmp_path):
     assert out["best_val_mf1"] > 0.45, out                    # chance is 0.2
     model, cfg2 = load_checkpoint(tmp_path / "run", torch.device("cpu"))
     roles = S.resolve(sp, "cv", 0)
-    ds = make_dataset(load_cohort(root, "SC", set(roles["test"])), cfg2, "Pz-Oz", train=False)
+    ds = make_dataset(load_cohort(root, "SC", set(roles["test"]), split_file=spf), cfg2, "Pz-Oz", train=False)
     real, _ = evaluate(model, ds, torch.device("cpu"))
     surr, _ = evaluate(model, ds, torch.device("cpu"), condition="global_phase")
     assert real["n"] == surr["n"] == 180 and real["n_subjects"] == 3

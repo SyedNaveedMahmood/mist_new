@@ -5,6 +5,7 @@ from mist.data import splits as S
 from mist.data.dataset import SequenceDataset
 from mist.data.sleepedf import labels_from_annotations, parse_name
 from mist.data.store import load_cohort
+from conftest import write_split
 
 
 def test_parse_name():
@@ -26,8 +27,8 @@ def test_labels_from_annotations_merges_n3_and_marks_unscored():
 
 
 def test_store_views_and_eval_tiling(store):
-    root, _ = store
-    nights = load_cohort(root, "SC")
+    root, subs = store
+    nights = load_cohort(root, "SC", split_file=write_split(root, subs, lockbox=[]))
     assert len(nights) == 12 and nights[0].x.shape == (60, 2, 3000)
     ds = SequenceDataset(nights[:2], "Pz-Oz", [(1.0, 0.5), (4.0, 2.0)], view="full", seq_len=25, train=False)
     seen = {}

@@ -46,3 +46,15 @@ def store(tmp_path):
                    {"subject": s, "night": 1, "cohort": "SC", "channels": ["Fpz-Cz", "Pz-Oz"], "age": 50 + 3 * k})
         subs[s] = {"age": 50 + 3 * k}
     return tmp_path, subs
+
+
+def write_split(root, subs, lockbox):
+    """Minimal split file for a synthetic store; `lockbox` lists cohort-qualified ids."""
+    import json
+    dev = sorted(set(subs) - set(lockbox))
+    sp = {"version": 1, "seed": 0, "quarantined_sc": [], "lockbox": sorted(lockbox), "dev": dev,
+          "folds": [dev[i::4] for i in range(4)], "sets": {"young": [], "mid": [], "old": []},
+          "age_cuts": [0, 0], "st": []}
+    f = root / "split_test.json"
+    f.write_text(json.dumps(sp))
+    return f

@@ -75,7 +75,8 @@ def train(cfg: dict, paths: dict, out_dir: Path) -> dict:
     roles = S.resolve(sp, cfg["split"]["protocol"], cfg["split"].get("fold", 0))
     if cfg["split"]["protocol"] == "lockbox" and not cfg["split"].get("i_am_running_the_final_confirmation"):
         raise RuntimeError("the lockbox is opened once, by task T12 only")
-    nights = load_cohort(paths["store_root"], d.get("cohort", "SC"), set(roles["train"]) | set(roles["val"]))
+    nights = load_cohort(paths["store_root"], d.get("cohort", "SC"), set(roles["train"]) | set(roles["val"]),
+                         split_file=cfg["split"]["file"])
     tr = make_dataset([n for n in nights if n.subject in set(roles["train"])], cfg, d["channel"], True)
     va = make_dataset([n for n in nights if n.subject in set(roles["val"])], cfg, d["channel"], False)
 

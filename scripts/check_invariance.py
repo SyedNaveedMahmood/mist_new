@@ -36,7 +36,7 @@ def main():
     # dev people only: the lockbox is loaded by task T12 and nothing else
     dev = set(S.load(a.split)["dev"])
     rows = []
-    for n in load_cohort(load_paths()["store_root"], "SC", dev)[: a.n_nights]:
+    for n in load_cohort(load_paths()["store_root"], "SC", dev, split_file=a.split)[: a.n_nights]:
         x = torch.from_numpy(n.x[n.view_slice("std"), n.channel_index(a.channel)].copy())
         X = torch.fft.rfft(x, dim=-1)
         f = torch.fft.rfftfreq(x.shape[-1], 0.01)

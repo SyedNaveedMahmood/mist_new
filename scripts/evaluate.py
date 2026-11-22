@@ -33,7 +33,9 @@ def main():
     if protocol == "lockbox" and not cfg["split"].get("i_am_running_the_final_confirmation"):
         raise SystemExit("the lockbox is opened once, by task T12 only")
     roles = S.resolve(S.load(cfg["split"]["file"]), protocol, cfg["split"].get("fold", 0))
-    nights = load_cohort(load_paths(a.paths)["store_root"], roles["test_cohort"], set(roles["test"]))
+    nights = load_cohort(load_paths(a.paths)["store_root"], roles["test_cohort"], set(roles["test"]),
+                         split_file=cfg["split"]["file"],
+                         open_lockbox=protocol == "lockbox" and bool(cfg["split"].get("i_am_running_the_final_confirmation")))
     channel = a.channel or cfg["data"]["channel"]
     ds = make_dataset(nights, cfg, channel, train=False)
     streams = cfg["model"].get("streams", []) if cfg["model"].get("name", "mist_grm") == "mist_grm" else []
