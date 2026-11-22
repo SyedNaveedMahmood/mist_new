@@ -70,7 +70,7 @@ def test_end_to_end_training_learns_synthetic_stages(store, tmp_path):
     spf = tmp_path / "sp.json"; spf.write_text(json.dumps(sp))
     cfg = {"data": {"cohort": "SC", "channel": "Fpz-Cz", "view": "full", "seq_len": 6, "windows_per_night": 8},
            "split": {"file": str(spf), "protocol": "cv", "fold": 0},
-           "train": {"epochs": 10, "batch_size": 8, "lr": 3e-3, "patience": 10, "seed": 0, "num_workers": 0, "device": "cpu"},
+           "train": {"epochs": 10, "batch_size": 8, "lr": 3e-3, "seed": 0, "num_workers": 0, "device": "cpu"},
            "model": {**SMALL, "streams": ["G", "R", "M"], "critic_weight": 0.3}}
     out = train(cfg, {"store_root": str(root)}, tmp_path / "run")
     assert out["best_val_mf1"] > 0.45, out                    # chance is 0.2

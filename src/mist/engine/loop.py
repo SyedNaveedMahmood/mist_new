@@ -99,7 +99,11 @@ def train(cfg: dict, paths: dict, out_dir: Path) -> dict:
 
     (out_dir / "config.yaml").write_text(yaml.safe_dump(cfg))
     log = (out_dir / "log.jsonl").open("a")
-    best, best_epoch, patience = -1.0, -1, t.get("patience", 8)
+    # no early stopping: the cosine schedule runs to zero and the best
+    # source-validation checkpoint is kept (stopping early left the LR undecayed)
+    if t.get("patience") is not None:
+        raise ValueError("train.patience is no longer supported: every run trains the full schedule")
+    best, best_epoch = -1.0, -1
     cuda = device.type == "cuda"
     if cuda:
         torch.cuda.reset_peak_memory_stats(device)
@@ -128,8 +132,6 @@ def train(cfg: dict, paths: dict, out_dir: Path) -> dict:
         if val["mf1"] > best:
             best, best_epoch = val["mf1"], ep
             torch.save({"model": model.state_dict(), "cfg": cfg, "epoch": ep}, out_dir / "best.pt")
-        elif ep - best_epoch >= patience:
-            break
     summary = {"best_val_mf1": best, "best_epoch": best_epoch, "params": count_parameters(model),
                "epochs_run": ep + 1, "wall_sec": round(time.time() - t_start, 1),
                "gpu_peak_mb": round(torch.cuda.max_memory_allocated(device) / 2**20) if cuda else None,
