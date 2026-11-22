@@ -13,4 +13,4 @@ Defaults are what the code does today. Change the answer here and in the config 
 
 Sign-off log (owner, date, decision IDs):
 
--
+- Syed Naveed Mahmood, 2026-11-22: D1 = Yes (release 35, keep 20 locked; `make_splits.py` defaults n_lockbox=20, seed 20261122). D2 to D6 = the defaults in the table above. Conveyed in the owner's implementation brief and recorded by Claude Code.
