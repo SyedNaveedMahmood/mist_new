@@ -3,8 +3,8 @@
 **Updated:** 2026-11-22 (Claude Code, owner offline under the delegation in docs/DECISIONS.md)
 
 ## Summary
-- **Done:** T0 setup (tests pass), T1 store (G0 passed, from the built manifest), T2 splits frozen, T4 real-data invariance, T5 `lf` view, lockbox hardening, early-stopping removal.
-- **Running:** recipe step 1b (class weighting null vs sqrt_inv, attnsleep + raw, 5 folds, seed 0, validation only); downloads HMC, ISRUC I+III, DOD-H.
+- **Done:** T0 setup (tests pass), T1 store (G0 passed, from the built manifest), T2 splits frozen, T4 real-data invariance, T5 `lf` view, lockbox hardening (load_cohort + legacy NPZ), early-stopping removal, T9 stage-targeted critic, T8 code (knock_slots, detectors, gallery; gallery run needs a grm checkpoint), E0/E1 runners and aggregation, HMC reader (phase-2 code only), HMC download (checksum-verified).
+- **Running:** recipe step 1b (class weighting null vs sqrt_inv, attnsleep + raw, 5 folds, seed 0, validation only; attnsleep ~4 min/run, raw ~15 min/run); DOD-H download; ISRUC retry scheduled (MEGA quota, D-007).
 - **Failed / open:** G0b under the pre-fix recipe (attnsleep fold 0: 0.6999 < 0.70; kept in the registry as pre-fix). G0b is re-decided once, on 5 folds, under the frozen recipe.
 - **Next:** freeze recipe -> G0b (5-fold attnsleep test, once) -> `raw`/`grm` timing -> Sleep-EDF-20 replication (check only) -> T6 / E0.
 
@@ -19,9 +19,9 @@
 ## Downloads (free disk is reported after each)
 | Dataset | State |
 | --- | --- |
-| HMC v1.1 (15.7 GB) | downloading |
+| HMC v1.1 (15.7 GB) | complete, all 456 files match SHA256SUMS, 151 recordings; free disk after: 114 GB |
 | CAP | complete on disk, checksum-verified; nothing to download |
-| ISRUC I + III (16.5 GB) | downloading (allow-list; 5 non-standard files skipped) |
+| ISRUC I + III (16.5 GB) | group III complete (10 subjects); group I 11/100 subjects; paused on MEGA anonymous quota, resumable retry scheduled (D-007) |
 | DOD-H (21.9 GB zip) | downloading; md5 check, extract, verify, delete zip |
 | DOD-O, CinC 2018 | deferred by owner (disk) |
 | DREAMS, SHHS, MASS, MESA, MrOS | not downloaded (licence / applications) |
