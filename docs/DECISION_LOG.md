@@ -48,3 +48,9 @@ Decisions taken by Claude Code while the owner is offline (delegation of 2026-11
 ### 2026-11-22 - D-006: E0 scope
 - **Chosen:** E0 = raw and attnsleep under `cv`, evaluated in-domain, Pz-Oz (montage) and sc2st (all ST nights, then placebo and temazepam nights separately), plus the lf window for in-domain and sc2st as sensitivity. The age-shift protocols need separate training and are covered in E1, not E0 (the owner's T6 list names only in-domain, Pz-Oz and sc2st).
 - **Seed 0** of E0 reuses the recipe-sweep runs whose class-weight setting is selected, because their configuration is identical to the frozen recipe; seeds 1 and 2 are trained new.
+
+### 2026-11-22 - D-007: ISRUC download stalled on MEGA's anonymous transfer quota
+- **Came up:** After about 3 GB (all of group III, 11 subjects of group I) MEGA stopped serving (0 bytes/s even for a 2.4 KB file).
+- **Options:** (a) wait for the quota to reset and resume; (b) switch to the Google Drive mirror listed on the ISRUC site; (c) create a MEGA account.
+- **Chosen:** (a). The fetch is resumable (complete files are skipped by size); retry scheduled 3 h later with a 30 min timeout per file. (c) is reserved for the owner (account creation). (b) stays as a fallback if MEGA keeps refusing.
+- **Reversible:** yes.
