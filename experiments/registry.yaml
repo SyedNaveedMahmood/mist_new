@@ -149,6 +149,13 @@ runs:
     note: 'Gate G1 PASSED under the pre-registered rule D-005 (in-domain, a stage F1 drop >= 1 point under local_phase with 95% CI excluding 0): all 5 stages for both models, smallest raw N2 +5.8 [+4.2, +7.6].
       Decided on the corrected surrogate. Caveat recorded in reports/e0.md: local_phase also removes sub-2 s spectral timing, and surrogates move inputs off-distribution, so effects bound reliance from above.
       Consequence: E1 proceeds under the full plan (EXPERIMENT_PLAN sections 5 and 11).'
+  - id: timing_grm_cascade
+    date: '2026-11-23'
+    commit: 1a08754
+    evals: [runs/e1_grm_cv0_s0/train_summary.json, runs/e1_cascade_cv0_s0/train_summary.json]
+    status: VERIFIED
+    note: 'T6b timing, alone on the GPU, frozen recipe, fold 0 seed 0. grm: 30.5 s/epoch, 1218 s/run, 9777 MB peak, best val MF1 0.780 (epoch 30). cascade (activation checkpointing, D-013): 219.6 s/epoch,
+      8782 s/run, 7065 MB peak, best val MF1 0.779 (epoch 15). Validation only. Both runs are reused as E1 seed 0 fold 0. Budget consequences in DECISION_LOG D-014.'
 
 datasets:
   sleep-edfx: {licence: "ODC Attribution 1.0", status: VERIFIED, note: "licence read from PhysioNet page 2026-11-18"}

@@ -146,6 +146,20 @@ After every choice above is frozen and written into `experiments/registry.yaml`:
 
 Time per run is unknown until T3 measures it on the workstation. If a run exceeds about 30 minutes, cut seeds to 2 for the non-decisive arms (`r`, `m`, `grm_loose`, `grm_nocritic`) before cutting folds.
 
+**Measured 2026-11-23 (DECISION_LOG D-014).** Per run, alone on the RTX 4080 SUPER: `attnsleep` about 5 min, `raw` about 26 min, `grm` 20 min (30.5 s/epoch), `cascade` 2.44 h (219.6 s/epoch). The cut above therefore applies. E1 as run (scripts/e1_queue.sh):
+
+| Block | Trainings | GPU hours (approx.) |
+| --- | ---: | ---: |
+| `cv` decisive, 3 seeds: cascade, cascade_placebo, cascade_absolute | 45 | 110 |
+| `cv` decisive, 3 seeds: gr, grm_placebo, grm, grm_absolute | 60 | 21 |
+| `cv` 2 seeds: grm_nocritic, cascade_nocritic | 20 | 28 |
+| `cv` 1 seed: r, m, grm_loose, cascade_bands, cascade_broad | 25 | 27 |
+| age shift, 3 seeds: raw, gr, grm_placebo, grm, grm_absolute, cascade, cascade_placebo | 42 | 40 |
+| Pz-Oz `cv`, 3 seeds: same 7 arms | 105 | 99 |
+| E1 total | 297 | about 324 (13.5 days) plus evaluation |
+
+`raw` and `attnsleep` under `cv` are the E0 runs. E2 then runs on `cascade` with one seed (35 trainings, about 85 h).
+
 ## 7. Statistics
 
 - Unit of analysis: the test subject. Nights of one person are pooled first.

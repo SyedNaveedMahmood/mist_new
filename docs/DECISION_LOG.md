@@ -85,3 +85,17 @@ Decisions taken by Claude Code while the owner is offline (delegation of 2026-11
 - **Options:** (a) smaller batch; (b) mixed precision; (c) gradient accumulation; (d) activation checkpointing of the encoder in chunks.
 - **Chosen:** (d). It leaves the arithmetic unchanged (encoder has no dropout, only per-sample GroupNorm; a test checks values and gradients match), so the frozen recipe is untouched. (a) and (b) change the recipe; (c) changes how the loss is averaged over unequal scored-epoch counts. Cost: extra compute, measured in the timing run.
 - **Reversible:** yes.
+
+### 2026-11-23 - D-014: measured cost of the cascade; E1 budget and order
+- **Measured (alone on the GPU, frozen recipe, fold 0 seed 0):** `grm` 30.5 s/epoch, 1218 s/run, 9.8 GB peak; `cascade` (with D-013 checkpointing) 219.6 s/epoch, 8782 s/run (2.44 h), 7.1 GB peak. The cascade is 7.2x slower: its shared encoder runs on 6 channel waveforms per token, plus the checkpoint recompute. Best validation macro-F1 at fold 0: grm 0.780 (epoch 30), cascade 0.779 (epoch 15); validation only, no test score was read.
+- **Came up:** E1 as written (section 6 plus section 11) is about 360 trainings; with 117+ cascade trainings at 2.44 h it is well over two weeks. EXPERIMENT_PLAN section 6 says to cut seeds for non-decisive arms when a run exceeds 30 minutes.
+- **Chosen (the pre-decided cuts, nothing decisive cut):**
+  - Full 5 folds x 3 seeds: `cascade`, `cascade_placebo`, `cascade_absolute`, `gr`, `grm_placebo`, `grm`, `grm_absolute` (raw and attnsleep come from E0).
+  - 2 seeds: `grm_nocritic`, `cascade_nocritic`. 1 seed: `r`, `m`, `grm_loose` (section 11 order), `cascade_bands`, `cascade_broad` (non-decisive ablations, treated like `r`/`m`).
+  - Age shift and Pz-Oz `cv`, 3 seeds: `raw`, `gr`, `grm_placebo`, `grm`, `grm_absolute`, `cascade`, `cascade_placebo`.
+  - E2 (dose) will use 1 seed, as planned.
+- **Plan gap found:** section 11 states H3 as `cascade` vs a cascade without the night reference but its training count (75) omits `cascade_absolute`. Added at full seeds (+15 trainings), because H3 is in the Holm family.
+- **Order:** scripts/e1_queue.sh, serial on the one GPU (a second concurrent job would exceed 16 GB with a cascade run and gives little throughput at 98% utilisation). Seed 0 of the decisive cascade arms first, then the decisive parallel arms, then further seeds, then ablations, then the age and Pz-Oz blocks.
+- **Estimate:** 297 trainings, about 324 GPU hours of training (about 13.5 days) plus evaluation. Recorded in EXPERIMENT_PLAN section 6.
+- **Not chosen:** mixed precision or a smaller batch for the cascade only (would change the frozen recipe for one arm and confound the cascade vs raw comparison).
+- **Reversible:** yes; more seeds can be added later without changing anything already run.
