@@ -23,6 +23,19 @@ def test_local_phase_keeps_band_power_roughly():
     assert (a - b).abs().mean() > 0.1 * a.abs().mean()
 
 
+def test_local_phase_preserves_power_in_expectation():
+    """Regression for the overlap-add power loss (2026-11-23): the old code lost ~0.3 log10 in every band.
+
+    Tolerances follow the 2 s window: bands from 4 Hz up must keep power within 0.05 log10 (12%);
+    1-4 Hz, where the Hann main lobe (+-1 Hz) moves power between neighbouring bins, within 0.15."""
+    a = eeg_like(64, 0).double()
+    b = local_phase(a.float(), generator=torch.Generator().manual_seed(3)).double()
+    assert 0.9 < float((b.pow(2).mean() / a.pow(2).mean()).sqrt()) < 1.1
+    for (lo, hi), tol in [((1, 4), 0.15), ((4, 8), 0.05), ((8, 12), 0.05), ((12, 16), 0.05), ((16, 35), 0.05)]:
+        lr = torch.log10(band_power(b, lo, hi) / band_power(a, lo, hi)).median()
+        assert abs(float(lr)) < tol, (lo, hi, float(lr))
+
+
 def test_flatten_tilt_keeps_phase_and_power_removes_slope():
     a = x(); b = flatten_tilt(a)
     f = torch.fft.rfftfreq(3000, 0.01); band = (f >= 1) & (f <= 35)

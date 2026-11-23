@@ -33,7 +33,13 @@ def global_phase(x: torch.Tensor, generator: torch.Generator | None = None) -> t
 
 
 def local_phase(x: torch.Tensor, win: int = 200, generator: torch.Generator | None = None) -> torch.Tensor:
-    """Phase-randomise each short-time frame (sqrt-Hann, 50% overlap) and overlap-add."""
+    """Phase-randomise each short-time frame (sqrt-Hann, 50% overlap) and overlap-add.
+
+    A randomised frame spreads its energy evenly over the frame instead of under
+    the analysis window, so the synthesis window keeps only mean(w**2) of it and
+    overlapping frames add incoherently. Dividing by sqrt(mean(w**2)) restores
+    the expected power (fixed 2026-11-23; before, every band lost about half its
+    power, see experiments/registry.yaml correction_e0_local_phase)."""
     shape = x.shape
     flat = x.reshape(-1, shape[-1])
     w = torch.hann_window(win, periodic=True, device=x.device).sqrt()
@@ -42,7 +48,7 @@ def local_phase(x: torch.Tensor, win: int = 200, generator: torch.Generator | No
     ph[:, 0] = 1.0
     ph[:, -1] = 1.0
     y = torch.istft(S.abs() * ph, n_fft=win, hop_length=win // 2, window=w, center=True, length=shape[-1])
-    return y.reshape(shape)
+    return (y / torch.sqrt((w ** 2).mean())).reshape(shape)
 
 
 def flatten_tilt(x: torch.Tensor, fs: int = 100, f_lo: float = 1.0, f_hi: float = 35.0) -> torch.Tensor:
