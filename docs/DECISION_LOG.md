@@ -70,3 +70,12 @@ Decisions taken by Claude Code while the owner is offline (delegation of 2026-11
 - **Not changed:** the parallel path (ScaleBranch), its tests and configs. Existing runs stay valid.
 - **Order of work:** E0 (raw, attnsleep) runs unchanged on the GPU while T6b was implemented; the cascade and grm timing runs follow E0 so timings are not distorted by a shared GPU.
 - **Reversible:** yes; no cascade result exists yet.
+
+### 2026-11-23 - D-011: local_phase surrogate bug found after E0; fixed and E0 re-evaluated
+- **Came up:** the first E0 tables showed local_phase costs up to +45 points (attnsleep W). Following the owner's rule ("a result that looks too good: assume a fault first"), a model-free fidelity audit (scripts/audit_surrogates.py, fold-0 training nights) showed the surrogate lost about half the power in every band.
+- **Chosen:** treated as a result-changing bug under the pre-decided answer: analytic fix (no fitted constant), regression test, rerun of all affected evaluations (150 files), correction entry in the registry, pre-fix report and files kept. The G1 rule (D-005) and the probe itself were **not** changed: replacing local_phase by another surrogate after seeing test scores would be a test-informed analysis choice (hard limit 3).
+- **Result:** G1 PASSED both before and after the fix; effect sizes changed (for example raw N3 +36 -> +10 points). The probe-fidelity table and its reading are in reports/e0.md.
+- **Reversible:** the fix is a correctness fix; not reversible in spirit.
+
+### 2026-11-23 - D-012: G1 status label
+- **Chosen:** G1 = PASSED (VERIFIED for the pre-registered rule). The interpretation caveats (sub-2 s timing, off-distribution inputs) are stated in reports/e0.md and the registry, not used to re-decide the gate. E1 runs the full plan, which is also the more complete option.

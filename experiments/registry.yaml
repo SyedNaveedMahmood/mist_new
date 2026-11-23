@@ -108,6 +108,47 @@ runs:
     note: 'Gate G0b (owner redefinition 2026-11-22: attnsleep 5-fold pooled test macro-F1, std, Fpz-Cz, seed 0 >= 0.70) PASSED at 0.7277. Frozen recipe (recipe_frozen). Evaluated once. Checks: each fold''s
       tested people == split test people, disjoint from train/val and lockbox; all 54 dev people tested once. Scope: Sleep-EDF SC dev people (ages 25-~90 excluding lockbox), std view. Below the published
       EDF-20 figure (0.781), which uses a different cohort and protocol; see replication section.'
+  - id: correction_e0_local_phase
+    date: '2026-11-23'
+    commit: 1be1df8
+    corrects: E0 evaluations (first pass, local_phase cells); reports/e0_PREFIX_local_phase_bug.md
+    evals: [runs/e0/surrogate_audit_PREFIX.json, runs/e0/surrogate_audit.json]
+    status: VERIFIED
+    note: 'src/mist/data/surrogates.local_phase lost ~half the power in every band (real Fpz-Cz: -0.29 to -0.36 log10 per band, RMS x0.72): overlap-add of phase-randomised sqrt-Hann frames keeps only mean(w^2)
+      of each frame''s energy. Fixed by the analytic correction 1/sqrt(mean(w^2)) with a regression test that fails on the old code. All 150 E0 eval files rerun; real, global_phase and flatten_tilt cells
+      identical (so G0b is unchanged); local_phase cells changed. Old files kept in runs/<run>/prefix_local_phase_bug/. Found by a fidelity audit triggered by the size of the first local_phase effects (W
+      +45 points), not by tuning. Pre-fix G1 also passed; the decision did not change, the effect sizes roughly halved for some stages.'
+  - id: e0
+    date: '2026-11-23'
+    commit: '1be1df8 (evaluation); training: frozen recipe, seeds 0-2'
+    script: scripts/run_e0.sh sqrt_inv; scripts/aggregate.py e0
+    runs: [runs/e0_attnsleep_cv0_s0, runs/e0_attnsleep_cv0_s1, runs/e0_attnsleep_cv0_s2, runs/e0_attnsleep_cv1_s0, runs/e0_attnsleep_cv1_s1, runs/e0_attnsleep_cv1_s2, runs/e0_attnsleep_cv2_s0, runs/e0_attnsleep_cv2_s1,
+      runs/e0_attnsleep_cv2_s2, runs/e0_attnsleep_cv3_s0, runs/e0_attnsleep_cv3_s1, runs/e0_attnsleep_cv3_s2, runs/e0_attnsleep_cv4_s0, runs/e0_attnsleep_cv4_s1, runs/e0_attnsleep_cv4_s2, runs/e0_raw_cv0_s0,
+      runs/e0_raw_cv0_s1, runs/e0_raw_cv0_s2, runs/e0_raw_cv1_s0, runs/e0_raw_cv1_s1, runs/e0_raw_cv1_s2, runs/e0_raw_cv2_s0, runs/e0_raw_cv2_s1, runs/e0_raw_cv2_s2, runs/e0_raw_cv3_s0, runs/e0_raw_cv3_s1,
+      runs/e0_raw_cv3_s2, runs/e0_raw_cv4_s0, runs/e0_raw_cv4_s1, runs/e0_raw_cv4_s2]
+    split_file: splits/sleepedf_v1.json
+    protocol: cv (evaluated in-domain, Pz-Oz, sc2st, lf)
+    train_channel: Fpz-Cz
+    evals: [reports/e0.md, reports/e0_tables.json, runs/e0_attnsleep_cv0_s0/eval_test_*.json]
+    result:
+      in_domain_mf1: {attnsleep: 0.724, raw: 0.752}
+      montage_mf1: {attnsleep: 0.611, raw: 0.649}
+      sc2st_mf1: {attnsleep: 0.693, raw: 0.701}
+      local_phase_cost_mf1:
+        attnsleep: {cv: 0.165, montage: 0.049, sc2st: 0.061}
+        raw: {cv: 0.118, montage: 0.018, sc2st: -0.006}
+    status: VERIFIED
+    note: 30 runs (2 models x 5 folds x 3 seeds), 150 eval files. Seed 0 = recipe-sweep runs (identical config). Morphology reliance (local_phase cost) is large in-domain for both models and much smaller
+      under the within-database shifts; for raw on sc2st it is indistinguishable from 0 [-1.6, +0.4]. lf window gives the same picture as std. ST is development-grade. Effects are upper bounds on reliance
+      (surrogates also move inputs off-distribution; see reports/e0.md probe-fidelity section).
+  - id: g1_decision
+    date: '2026-11-23'
+    commit: 1be1df8
+    evals: [reports/e0.md]
+    status: VERIFIED
+    note: 'Gate G1 PASSED under the pre-registered rule D-005 (in-domain, a stage F1 drop >= 1 point under local_phase with 95% CI excluding 0): all 5 stages for both models, smallest raw N2 +5.8 [+4.2, +7.6].
+      Decided on the corrected surrogate. Caveat recorded in reports/e0.md: local_phase also removes sub-2 s spectral timing, and surrogates move inputs off-distribution, so effects bound reliance from above.
+      Consequence: E1 proceeds under the full plan (EXPERIMENT_PLAN sections 5 and 11).'
 
 datasets:
   sleep-edfx: {licence: "ODC Attribution 1.0", status: VERIFIED, note: "licence read from PhysioNet page 2026-11-18"}
