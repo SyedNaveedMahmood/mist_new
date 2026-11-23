@@ -1,0 +1,2 @@
+# Validation-gate fallback (band_width 32). Same network as cascade2; every channel only ever sees random phase.
+model: {topology: cascade, cascade_channels: all, streams: [G, R, M], morph_input: phase_only, band_rate: own, band_scales: [4.0], encoder_checkpoint: false, band_width: 32, destroy_prob: 1.0, critic_weight: 0.0}

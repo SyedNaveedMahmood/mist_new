@@ -112,7 +112,7 @@ def train(cfg: dict, paths: dict, out_dir: Path) -> dict:
     # source-validation checkpoint is kept (stopping early left the LR undecayed)
     if t.get("patience") is not None:
         raise ValueError("train.patience is no longer supported: every run trains the full schedule")
-    best, best_epoch = -1.0, -1
+    best, best_epoch, best_f1 = -1.0, -1, None
     cuda = device.type == "cuda"
     if cuda:
         torch.cuda.reset_peak_memory_stats(device)
@@ -133,15 +133,16 @@ def train(cfg: dict, paths: dict, out_dir: Path) -> dict:
             tot += float(loss.detach()); n += 1
         val, _ = evaluate(model, va, device, batch_size=bs)
         rec = {"epoch": ep, "loss": tot / max(n, 1), "val_mf1": val["mf1"], "val_acc": val["acc"],
-               "sec": round(time.time() - t0, 1)}
+               "sec": round(time.time() - t0, 1),
+               "val_f1": {k[3:]: v for k, v in val.items() if k.startswith("f1_")}}   # logging only (E4 matches N1 on validation)
         if cuda:
             rec["gpu_peak_mb"] = round(torch.cuda.max_memory_allocated(device) / 2**20)
         log.write(json.dumps(rec) + "\n"); log.flush()
         print(rec)
         if val["mf1"] > best:
-            best, best_epoch = val["mf1"], ep
+            best, best_epoch, best_f1 = val["mf1"], ep, rec["val_f1"]
             torch.save({"model": model.state_dict(), "cfg": cfg, "epoch": ep}, out_dir / "best.pt")
-    summary = {"best_val_mf1": best, "best_epoch": best_epoch, "params": count_parameters(model),
+    summary = {"best_val_mf1": best, "best_epoch": best_epoch, "best_val_f1": best_f1, "params": count_parameters(model),
                "epochs_run": ep + 1, "wall_sec": round(time.time() - t_start, 1),
                "gpu_peak_mb": round(torch.cuda.max_memory_allocated(device) / 2**20) if cuda else None,
                "commit": git_commit(), "roles": {k: v for k, v in roles.items()}}

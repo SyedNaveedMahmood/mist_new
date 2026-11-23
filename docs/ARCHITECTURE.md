@@ -273,3 +273,46 @@ The specification in 8.3 leaves these open. Each choice is the simplest reading;
 
 Measured on synthetic 1/f nights (tests/test_cascade.py, smooth zero-phase tilt and bump responses): relative change of G <= 0.005, R <= 0.008, band waveforms <= 0.006 overall and <= 0.012 for the worst channel (delta). Parameter counts with base.yaml: `cascade` = `cascade_placebo` = 699,337; `cascade_bands` 684,745; `cascade_broad` 626,377; `grm` 624,601.
 
+
+## 9. Revision 3 (2026-11-23): own-rate cascade (`cascade2`)
+
+Owner's decision D8 (docs/DECISIONS.md), made for the GPU budget of two 12-hour sessions a week. The idea of section 8 is unchanged: G goes directly to the composer; R makes positive per-channel gates; M is per-band phase-only shape plus broadband; only G and the gated M reach the composer. Three changes to the shape encoder.
+
+### 9.1 Changes
+
+| | Section 8 cascade | `cascade2` |
+| --- | --- | --- |
+| (a) Synthesis | every channel at the token length (100 or 400 samples) | each channel at its own length `n = 2 (k_top + 1)`, rounded up to a multiple of 8, minimum 16, `k_top` = the channel's highest FFT bin; `irfft` over bins `0..n/2` with `n` points, then unit RMS |
+| (b) Band channels | at both token scales | only at the 4 s scale; the 1 s scale keeps the broadband channel only, still gated by rhythm |
+| (c) Encoders | one WaveEncoder (width 32) for all six channels | WaveEncoder width 32 for broadband; a second WaveEncoder, width 16, shared by the five band channels |
+
+Lengths: 1 s token, broad 72. 4 s token, delta 32, theta 64, alpha 96, sigma 128, beta 288, broad 288 (full rate: 6 x 400).
+
+`destroy_bands` still acts on the broadband channel's bins at both scales, so at 1 s it randomises that band's bins in the broadband channel.
+
+### 9.2 What (a) does and does not change
+
+The own-rate waveform is the same band-limited waveform sampled on a coarser grid: at the grid points `t_j = j * win / n` it equals the full-rate waveform (up to the common factor `win / n`, which unit RMS removes), and its RMS equals the full-rate RMS (Parseval). Because `n / 2 > k_top`, the Nyquist bin is empty and `rfft` of the own-rate waveform returns exactly the channel's phasor bins, so no shape information is lost (tests 1 and 5). What changes is what the encoder sees per sample: a delta waveform is 32 samples long, so the encoder's kernels (9, 9, 7, 5 samples with three stride-2 steps) span a larger share of the token for slow bands than for fast ones. That is a design change, not a numerical identity, and it is why the validation gate in EXPERIMENT_PLAN section 12 exists.
+
+### 9.3 Configuration
+
+`MistConfig` gains `band_rate` (`full` | `own`), `band_scales` (token lengths in s that carry band channels; `null` = every scale), `band_width` (`null` = one encoder for all channels; an integer = the band encoder's width) and `encoder_checkpoint` (D-013 activation checkpointing; on by default). The defaults reproduce the section 8 model exactly: existing checkpoints load with `strict=True` and give bit-identical outputs (test 8 compares against `tests/fixtures/cascade_v1_reference.pt`, written by the pre-revision code). The new per-channel index buffers are not saved in checkpoints.
+
+Arms: `cascade2`, `cascade2_placebo` (destroy_prob 1.0, critic 0), `cascade2_absolute` (night_relative false); `cascade2w32*` (band_width 32) exist only for the validation-gate fallback.
+
+`cascade2` runs without checkpointing (`encoder_checkpoint: false`). The decision rests on a CPU count of the activations autograd saves in one training step at batch 32 (`scripts/dev/activation_memory.py`). That count gives 10.5 GB for `cascade2`, against 9.6 GB for `grm`, whose measured GPU peak is 9.8 GB. Without checkpointing the full-rate cascade needs 55 GB. If a run still runs out of memory, the session queue retries it once with checkpointing, which gives the same arithmetic.
+
+### 9.4 Properties (tests/test_cascade2.py)
+
+1. Own-rate waveform = full-rate waveform at the coarse grid points; equal RMS.
+2. Every code (g, r, gates, m, e, a) is invariant to a positive gain.
+3. G, r and the gates depend on |X| only.
+4. m, e and a depend on arg X only.
+5. `rfft` of each own-rate waveform returns that channel's phasor bins and nothing else.
+6. With destroy_prob 1: same parameters as `cascade2`, and the output is identical for a token and for the same token with its phase replaced.
+7. `destroy_bands: [b]` changes only band b's channel and the broadband channel (4 s), and the broadband channel at 1 s.
+8. The defaults reproduce the section 8 cascade outputs bit for bit.
+
+Plus: forward and backward with the critic, the band encoder receives gradients and has width 16, and the checkpointing switch changes neither values nor gradients. Tests 1 and 5 were checked to fail on two deliberate synthesis faults (a one-sample shift, a dropped bin). All on synthetic signals; nothing here is evidence on real EEG.
+
+Parameter counts with base.yaml: `cascade2` = `cascade2_placebo` = 678,457 (`cascade` 699,337).

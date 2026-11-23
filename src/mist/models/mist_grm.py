@@ -62,6 +62,11 @@ class MistConfig:
     topology: str = "parallel"
     cascade_channels: str = "all"                 # all = 5 bands + broadband | bands | broad
     band_slots: int = 16                          # shape slots per cascade channel
+    # revision 3 (ARCHITECTURE section 9). Defaults reproduce the section 8 cascade exactly.
+    band_rate: str = "full"                       # full: every channel at the token length | own: each at its own length
+    band_scales: tuple | None = None              # token lengths (s) that carry band channels; None = every scale
+    band_width: int | None = None                 # None: one WaveEncoder for all channels; int: second encoder of this width for the bands
+    encoder_checkpoint: bool = True               # D-013 activation checkpointing of the shape encoder(s)
     extra: dict = field(default_factory=dict)
 
 

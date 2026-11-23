@@ -156,6 +156,14 @@ runs:
     status: VERIFIED
     note: 'T6b timing, alone on the GPU, frozen recipe, fold 0 seed 0. grm: 30.5 s/epoch, 1218 s/run, 9777 MB peak, best val MF1 0.780 (epoch 30). cascade (activation checkpointing, D-013): 219.6 s/epoch,
       8782 s/run, 7065 MB peak, best val MF1 0.779 (epoch 15). Validation only. Both runs are reused as E1 seed 0 fold 0. Budget consequences in DECISION_LOG D-014.'
+  - id: revision3_plan
+    date: '2026-11-23'
+    commit: pending-T6c
+    status: VERIFIED
+    evals: []
+    note: 'Owner''s revision 3 (DECISIONS D8): own-rate cascade cascade2 and the GPU session plan (EXPERIMENT_PLAN section 12). Blind change: no E1 test score had been read, printed or aggregated. E1 queue
+      stopped 2026-11-23 23:33; e1_cascade_cv{0..4}_s0 (full-rate, all trained) kept as the validation-gate reference, mean best val MF1 0.7634. Validation gate, H1 pooling over the protocols run, and the
+      priority list fixed before any E1 test score.'
 
 datasets:
   sleep-edfx: {licence: "ODC Attribution 1.0", status: VERIFIED, note: "licence read from PhysioNet page 2026-11-18"}

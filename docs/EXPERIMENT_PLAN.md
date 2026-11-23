@@ -146,7 +146,7 @@ After every choice above is frozen and written into `experiments/registry.yaml`:
 
 Time per run is unknown until T3 measures it on the workstation. If a run exceeds about 30 minutes, cut seeds to 2 for the non-decisive arms (`r`, `m`, `grm_loose`, `grm_nocritic`) before cutting folds.
 
-**Measured 2026-11-23 (DECISION_LOG D-014).** Per run, alone on the RTX 4080 SUPER: `attnsleep` about 5 min, `raw` about 26 min, `grm` 20 min (30.5 s/epoch), `cascade` 2.44 h (219.6 s/epoch). The cut above therefore applies. E1 as run (scripts/e1_queue.sh):
+**Superseded by section 12 (owner, 2026-11-23).** Kept for the record. **Measured 2026-11-23 (DECISION_LOG D-014).** Per run, alone on the RTX 4080 SUPER: `attnsleep` about 5 min, `raw` about 26 min, `grm` 20 min (30.5 s/epoch), `cascade` 2.44 h (219.6 s/epoch). The cut above therefore applies. E1 as run (scripts/e1_queue.sh):
 
 | Block | Trainings | GPU hours (approx.) |
 | --- | ---: | ---: |
@@ -208,3 +208,52 @@ The supervisor's cascade topology (docs/ARCHITECTURE.md, section 8) becomes the 
 E0 is unchanged: it uses `raw` and `attnsleep` only. The recipe stays frozen.
 
 Extra trainings: `cascade`, `cascade_placebo`, `cascade_nocritic`, `cascade_bands`, `cascade_broad` under `cv` (5 x 15 = 75), plus `cascade` and `cascade_placebo` under the age protocols and Pz-Oz (2 x 21 = 42). To stay inside the budget, drop `r`, `m` and `grm_loose` to one seed first.
+
+## 12. Revision 3 (2026-11-23): GPU sessions and the own-rate cascade
+
+Owner's decision D8. It replaces the E1 table in section 6 and the D-014 queue. **No E1 test score had been read when this was fixed**; every change below is blind to E1 results.
+
+### 12.1 Session rules
+
+- The GPU is used only inside a session. A session starts when the owner writes SESSION START and lasts 12 hours unless the owner gives another end time. Every GPU process has ended 15 minutes before the end.
+- `scripts/session_queue.sh <N> "<end>"` walks `experiments/priority.txt` (written by `scripts/make_priority.py`) in order:
+  - **Fit rule.** A training starts only if the time left before the deadline (end minus 15 min) is at least 1.3 x its estimated duration, training plus its evaluations. Estimates are the largest measured time for that arm, from `runs/session_times.json`, else a conservative prior (the full-rate cascade time for `cascade2` until the timing run measures it).
+  - **Hard stop.** Each process also runs under a timeout that expires at the deadline. A training stopped that way moves to `runs/_interrupted`.
+  - **Pairs.** Pairs are interleaved by fold (`cascade2` fold f, then `cascade2_placebo` fold f) and start only if both fit.
+  - **Roll-over.** The walk stops at the first unit that does not fit, so the order is kept. Pending evaluations then run while they fit, and the queue stops.
+  - **Out of memory.** A training that fails with an out-of-memory error is retried once with encoder checkpointing (same arithmetic).
+- Inside a session each cv run writes three evaluations, real-input cell only (`--cells core`): in-domain, Pz-Oz and sc2st, std view. The lf-view evaluations run on CPU outside sessions (`CUDA_VISIBLE_DEVICES=`). The other cells (surrogates, knock-outs, `destroy_bands`) are E3 (P6), written to `eval_e3_*.json`.
+- All coding, tests and dry runs happen on CPU before a session (`scripts/session_queue.py --dry-run`). If `cascade2` is not ready when a session starts, the GPU runs P9 instead.
+- After each session: `scripts/session_report.py <N>` writes `reports/session_N.md` (runs done, minutes per run, results tables with intervals, what comes next); STATUS updated; pushed.
+
+### 12.2 Gates fixed before the session
+
+- **Time:** the first `cascade2` run (fold 0, seed 0) is the timing run. Target: 30 minutes or less including its three evaluations. If slower, no redesign: report the number and let the queue fit fewer runs.
+- **Accuracy, validation only:** after `cascade2` seed 0 has 5 folds, its mean best validation macro-F1 must be within 1.0 point of the full-rate cascade on the same folds. The reference is `e1_cascade_cv{0..4}_s0`, mean 0.7634; "within" is read two-sided.
+  - If it fails, set `band_width` to 32 (`cascade2w32`), rerun those 5 folds and check again.
+  - If that also fails, stop the `cascade2` queue and report; the GPU then runs P9.
+  - No test score is read for this decision (`scripts/gate_cascade2.py` reads only `train_summary.json`).
+- G2 (section 11 rule): `cascade2` within 1.5 points of `raw`, in-domain. H1 = `cascade2` - `cascade2_placebo`, **pooled over the protocols actually run** (in-domain, Pz-Oz, sc2st, the age shift); this was fixed before any E1 test score was read. After P1, G2 and H1 are reported on seed 0 as INTERIM (`aggregate.py e1 --seeds 0`); H1 becomes confirmatory on 3 seeds (P3).
+
+### 12.3 Priority list (walked in order; what does not fit rolls over)
+
+| Session | Item | Content | Trainings |
+| --- | --- | --- | ---: |
+| 1 | P1 | `cascade2` and `cascade2_placebo`, cv, seed 0. Then the validation gate, and G2 and H1 on seed 0 (INTERIM) | 10 |
+| 1 | P2 | the same two arms, seed 1 | 10 |
+| 2 | P3 | the same two arms, seed 2; H1 confirmatory on 3 seeds | 10 |
+| 2 | P4 | `cascade2_absolute`, cv, seed 0 (H3) | 5 |
+| 2 | P5 | age shift, both directions: `raw`, `cascade2`, `cascade2_placebo`, 3 seeds. Then reports/e1.md | 18 |
+| 3 | P6 | E3 on the P1 to P3 checkpoints, evaluation only: knock G, R, M and each band, in-domain and under each shift; band x stage table | 0 (90 evaluations) |
+| 3 | P7 | E2 trimmed: `destroy_prob` 0.5, `critic_weight` 0 and 1.0, cv, seed 0 (0 / 1.0 and 0.3 exist as `cascade2` and `cascade2_placebo`) | 15 |
+| 4 | P8 | E4: `cascade2_placebo` with `train.n1_weight` 1.5, 2.0 and 3.0, cv, seed 0. Take the weight whose validation N1 F1 (at the best-validation epoch, now logged) matches `cascade2` within 0.5 points; read test scores for that weight only | 15 |
+| 4 | P9 | parallel model: `grm`, `gr`, `grm_placebo`, cv, seed 0 (`grm` fold 0 exists) | 14 |
+| 5 | P10 | E4 with `context_layers: 0`: `cascade2`, `cascade2_placebo`, cv, seed 0 | 10 |
+| 5 | P11 | `cascade2_absolute` seeds 1 and 2; N-target arm (`critic_stages: [0, 1, 4]`) if time remains | 10 + 5 |
+| 6 | | freeze (T11). The lockbox stays the owner's to trigger | |
+
+Session numbers say where an item is expected; the queue simply continues down the list, so early finishes pull work forward and late ones roll it over.
+
+Deferred until the owner says so: the Pz-Oz-trained block, further seeds of the parallel arms, `grm_absolute`, `r`, `m`, `grm_loose`, `grm_nocritic`, `cascade2_bands`, `cascade2_broad`, the other E2 levels.
+
+The five full-rate `cascade` seed-0 runs are kept as the reference for the validation gate and reported descriptively (`cascade2` - `cascade`). The pending evaluations from before the revision (`e1_cascade_cv4_s0` sc2st; `e1_grm_cv0_s0` in-domain, Pz-Oz and sc2st) run in the pending phase.

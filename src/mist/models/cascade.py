@@ -11,6 +11,12 @@
 Only G and the gated morphology reach the composer; rhythm has no additive path.
 Power-blindness holds for m_b, e_b and a_b (functions of arg X only), not for u.
 
+Revision 3 (ARCHITECTURE section 9, `band_rate: own`): each channel's phase-only waveform is
+synthesised at its own length n = 2*(k_top+1), rounded up to a multiple of 8, minimum 16
+(k_top = the channel's highest FFT bin), i.e. the same band-limited waveform on a coarser grid;
+band channels can be limited to some token scales (`band_scales`) and given their own, narrower
+shared encoder (`band_width`). The defaults reproduce the section 8 model exactly.
+
 Switches: destroy_prob replaces every band's phase by random phase (G and r are
 untouched, parameters identical); destroy_bands randomises the phase of the named
 bands' bins in every channel (the band channel and the broadband channel), or,
@@ -85,7 +91,13 @@ class CascadeBranch(nn.Module):
         self.cfg = cfg
         self.fz = Factorizer(cfg.fs, win_s, hop_s, cfg.f_lo, cfg.f_hi)
         self.n_tok = self.fz.n_tokens(cfg.epoch_samples)
-        self.channels = CHANNEL_SETS[cfg.cascade_channels]
+        if cfg.band_rate not in ("full", "own"):
+            raise ValueError(f"band_rate must be full or own, not {cfg.band_rate!r}")
+        bands_here = cfg.band_scales is None or any(abs(win_s - b) < 1e-9 for b in cfg.band_scales)
+        self.channels = tuple(c for c in CHANNEL_SETS[cfg.cascade_channels] if bands_here or c == "broad")
+        if not self.channels:
+            raise ValueError(f"no morphology channel at token length {win_s} s")
+        self.own = cfg.band_rate == "own"
         self.use = {"G": True, "R": True, "M": True, "X": False}
         masks = band_masks(self.fz.freqs)
         if not masks.any(-1).all():
@@ -96,7 +108,15 @@ class CascadeBranch(nn.Module):
         C, d, du, ns, R = len(self.channels), cfg.d_stream, cfg.d_stream, cfg.band_slots, cfg.morph_residual
         self.gain = GainEmbed(cfg.d_gain)
         self.rhythm = RhythmEncoder(self.fz.n_freq, d, cfg.dropout)
-        self.morph = WaveEncoder(d)
+        self.morph = WaveEncoder(d)                           # broadband (and, if band_width is None, every channel)
+        self.morph_band = WaveEncoder(d, cfg.band_width) if cfg.band_width is not None and self.sel else None
+        self.ch_len = []                                      # own-rate length of each channel
+        for i, c in enumerate(self.channels):
+            mask = torch.ones_like(masks[0]) if c == "broad" else masks[BAND_NAMES.index(c)]
+            pos = torch.nonzero(mask).squeeze(-1)             # positions in the in-band spectrum
+            k_top = int(self.fz.band_idx[pos].max())
+            self.ch_len.append(max(16, -(-2 * (k_top + 1) // 8) * 8))
+            self.register_buffer(f"ch_pos{i}", pos, persistent=False)
         self.band_emb = nn.Parameter(torch.randn(C, d) * 0.02)
         self.codebook = BandCodebooks(C, ns, d, cfg.slot_temp)
         self.slot_emb = nn.Parameter(torch.randn(C, ns, du) / math.sqrt(ns))
@@ -114,8 +134,21 @@ class CascadeBranch(nn.Module):
         self.pool = AttnPool(cfg.d_token)
 
     # ------------------------------------------------------------- inputs of M
-    def waveforms(self, phasor: torch.Tensor, destroy_bands=(), gen=None, normalise: bool = True) -> torch.Tensor:
-        """Phasor [..., F] -> channel waveforms [..., C, win] (bands in self.channels order, broad last)."""
+    def own_synth(self, spec: torch.Tensor, i: int) -> torch.Tensor:
+        """In-band spectrum [..., F] -> channel i's waveform [..., n_i] from that channel's bins only.
+
+        irfft over bins 0..n_i/2 with n_i points: the band-limited waveform sampled every win/n_i
+        samples of the token, times win/n_i (irfft's 1/n normalisation). n_i/2 > k_top, so the
+        Nyquist bin is empty and rfft returns the channel's bins exactly."""
+        n, pos = self.ch_len[i], getattr(self, f"ch_pos{i}")
+        full = spec.new_zeros(*spec.shape[:-1], n // 2 + 1)
+        full[..., self.fz.band_idx[pos]] = spec[..., pos]
+        return torch.fft.irfft(full, n=n, dim=-1)
+
+    def waveforms(self, phasor: torch.Tensor, destroy_bands=(), gen=None, normalise: bool = True):
+        """Phasor [..., F] -> channel waveforms (bands in self.channels order, broad last).
+
+        band_rate full: one tensor [..., C, win]. band_rate own: a list of C tensors [..., n_c]."""
         bad = set(destroy_bands) - set(BAND_NAMES) - {"broad"}
         if bad:
             raise ValueError(f"unknown bands {sorted(bad)}")
@@ -126,6 +159,12 @@ class CascadeBranch(nn.Module):
         if hit:
             bins = self.all_masks[hit].any(0)
             ph = torch.where(bins, self.fz.random_phasor(phasor, gen), phasor)
+        if self.own:
+            toks = []
+            for i, c in enumerate(self.channels):
+                src = self.fz.random_phasor(phasor, gen) if c == "broad" and "broad" in destroy_bands else ph
+                toks.append(self.own_synth(src, i))
+            return [unit_rms(t) for t in toks] if normalise else toks
         toks = []
         if self.sel:
             toks.append(self.fz.synth(band_spectra(ph, self.all_masks[self.sel])))
@@ -137,21 +176,28 @@ class CascadeBranch(nn.Module):
 
     CKPT_CHUNK = 16384                                        # waveforms per checkpointed encoder call
 
-    def encode(self, m: torch.Tensor) -> torch.Tensor:
-        """[..., C, win] -> e [..., C, d].
+    def encode(self, m) -> torch.Tensor:
+        """[..., C, win] (or a list of C tensors [..., n_c]) -> e [..., C, d].
 
         While gradients are recorded, the encoder runs in checkpointed chunks: its activations are
         recomputed in the backward pass instead of stored. Six channels per token do not fit a 16 GB
         GPU at the frozen batch size otherwise. The arithmetic is unchanged (the encoder has no
         dropout and only per-sample GroupNorm), so this is a memory measure, not a recipe change."""
-        lead = m.shape[:-1]
-        flat = m.reshape(-1, self.fz.win)
-        if torch.is_grad_enabled() and flat.shape[0] > self.CKPT_CHUNK:
+        if isinstance(m, torch.Tensor) and self.morph_band is None:
+            return self._run(self.morph, m) + self.band_emb
+        chans = m.unbind(-2) if isinstance(m, torch.Tensor) else m
+        enc = [self.morph if c == "broad" or self.morph_band is None else self.morph_band for c in self.channels]
+        return torch.stack([self._run(f, w) for f, w in zip(enc, chans)], -2) + self.band_emb
+
+    def _run(self, enc: nn.Module, w: torch.Tensor) -> torch.Tensor:
+        lead = w.shape[:-1]
+        flat = w.reshape(-1, w.shape[-1])
+        if self.cfg.encoder_checkpoint and torch.is_grad_enabled() and flat.shape[0] > self.CKPT_CHUNK:
             from torch.utils.checkpoint import checkpoint
-            out = torch.cat([checkpoint(self.morph, c, use_reentrant=False) for c in flat.split(self.CKPT_CHUNK)])
+            out = torch.cat([checkpoint(enc, c, use_reentrant=False) for c in flat.split(self.CKPT_CHUNK)])
         else:
-            out = self.morph(flat)
-        return out.view(*lead, -1) + self.band_emb
+            out = enc(flat)
+        return out.view(*lead, -1)
 
     def codes(self, f: Factors, stats: dict, destroy_prob: float = 0.0, gen=None, destroy_bands=()) -> dict:
         """Every intermediate code of the cascade from the token factors (used by forward and the tests)."""
@@ -231,6 +277,7 @@ class CascadeBranch(nn.Module):
         sel = flat[idx]
         real = self.waveforms(sel)
         fake = self.waveforms(self.fz.random_phasor(sel, gen))
-        logits = self.critic(self.encode(torch.cat([real, fake]))).squeeze(-1)      # [2n, C]
+        both = torch.cat([real, fake]) if self.own is False else [torch.cat([r, f]) for r, f in zip(real, fake)]
+        logits = self.critic(self.encode(both)).squeeze(-1)      # [2n, C]
         target = torch.cat([torch.ones(n), torch.zeros(n)]).to(logits).unsqueeze(-1).expand_as(logits)
         return F.binary_cross_entropy_with_logits(logits, target)

@@ -1,0 +1,2 @@
+# Validation-gate fallback (band_width 32). cascade2 without the night reference (H3).
+model: {topology: cascade, cascade_channels: all, streams: [G, R, M], morph_input: phase_only, band_rate: own, band_scales: [4.0], encoder_checkpoint: false, band_width: 32, critic_weight: 0.3, allpass_rad: 0.5, night_relative: false}

@@ -7,6 +7,9 @@ Reports every (condition, intervention) cell needed by E0 and E3:
                  cascade only: destroy_<band> for delta..beta and broad (ARCHITECTURE 8.4)
 
     python scripts/evaluate.py --run runs/grm_cv0_s0 --channel Pz-Oz
+
+--cells core keeps only the real-input cell (GPU sessions, EXPERIMENT_PLAN section 12); --cells e3
+writes every other cell to eval_e3_*.json (task P6). Default: all cells, as before.
 """
 import argparse
 import json
@@ -28,7 +31,10 @@ def main():
     ap.add_argument("--paths", default="configs/paths.yaml")
     ap.add_argument("--tag", default="test")
     ap.add_argument("--view", default=None, help="evaluation window; default = training view (std). lf = label-free")
+    ap.add_argument("--cells", default="all", choices=("all", "core", "e3"))
     a = ap.parse_args()
+    if a.cells == "e3" and a.tag == "test":
+        a.tag = "e3"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, cfg = load_checkpoint(a.run, device)
     protocol = a.protocol or cfg["split"]["protocol"]
@@ -52,8 +58,12 @@ def main():
         from mist.models.cascade import BAND_NAMES, CHANNEL_SETS
         has_broad = "broad" in CHANNEL_SETS[cfg["model"].get("cascade_channels", "all")]
         cells += [("real", (), None, (b,)) for b in BAND_NAMES + (("broad",) if has_broad else ())]
+    if a.cells == "core":
+        cells = cells[:1]
+    elif a.cells == "e3":
+        cells = cells[1:]
     out = {"protocol": protocol, "channel": channel, "n_nights": len(nights), "view": cfg["data"].get("view", "std"),
-           "night_meta": {n.record_id: {"subject": n.subject, "condition": n.meta.get("condition")} for n in nights},
+           "cells_set": a.cells, "night_meta": {n.record_id: {"subject": n.subject, "condition": n.meta.get("condition")} for n in nights},
            "cells": {}}
     for cond, knock, destroy, bands in cells:
         key = (cond + ("" if not knock else f"|knock_{''.join(knock)}") + ("" if destroy is None else "|destroy_M")

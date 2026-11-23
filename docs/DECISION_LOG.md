@@ -106,3 +106,19 @@ Decisions taken by Claude Code while the owner is offline (delegation of 2026-11
 - **Kept unchanged:** `e1_cascade_cv{0..4}_s0` are the "full-rate cascade" reference for the cascade2 validation gate; `e1_grm_cv0_s0` is reused in P9.
 - **ISRUC:** the retry was cancelled. Group I goes ahead without subjects 4, 6 and 39: their .rec files never downloaded (MEGA quota); their scoring files are on disk. 547 of 550 allow-listed files are complete. The owner fetches the three files by hand (OPEN_QUESTIONS Q8).
 - **Superseded:** D-014's queue and the EXPERIMENT_PLAN section 6 E1 table (replaced by section 12).
+
+### 2026-11-23 - D-016: implementing revision 3 (T6c) and the session queue: choices not fixed by the owner
+All taken before any E1 test score was read; none uses a test score.
+- **Defaults reproduce the old cascade:** checked bit for bit against a fixture written by the pre-revision code (tests/fixtures/cascade_v1_reference.pt, synthetic model and input, no EEG), and `runs/e1_cascade_cv0_s0/best.pt` loads unchanged. The per-channel index buffers are non-persistent, so old and new checkpoints stay compatible.
+- **Checkpointing dropped for cascade2** (`encoder_checkpoint: false`). This rests on a CPU count of the activations saved for backward at batch 32: cascade2 10.5 GB; grm 9.6 GB (measured GPU peak 9.8 GB); full-rate cascade 55 GB, consistent with its out-of-memory failure. No GPU was used. If a training still runs out of memory, the queue retries once with checkpointing, which gives the same arithmetic.
+- **Band encoder:** `band_width: null` keeps one shared encoder (old behaviour); an integer adds the second encoder. The gate fallback `band_width: 32` therefore keeps two encoders and widens only the band encoder.
+- **Validation gate read two-sided** ("within 1.0 point": |diff| <= 1.0). If `cascade2` were more than 1 point *above* the reference, the rule would still send it to the fallback; the session report would flag that case for the owner.
+- **In-session evaluations write the real-input cell only** (`evaluate.py --cells core`). E1, G2 and H1 read only that cell. The other cells are E3 (P6) and go to `eval_e3_*.json`. This keeps session minutes for training, and the owner's 30-minute target includes three evaluations.
+- **Queue semantics:**
+  - A pair starts only if both runs fit, so an early end leaves balanced folds.
+  - The walk stops at the first unit that does not fit rather than skipping ahead to smaller items, which keeps the priority order.
+  - Estimates use the largest measured time per arm and block.
+  - The prior for an unmeasured `cascade2` is the full-rate cascade time (conservative).
+- **E4 weights** `train.n1_weight` in {1.5, 2.0, 3.0}. They multiply the frozen `sqrt_inv` class weight for N1 and were chosen without data as a spread around a doubling. The match to `cascade2` uses validation N1 F1 at the best-validation epoch, which training now logs (`val_f1` per epoch, `best_val_f1` in train_summary.json). This is logging only, not a recipe change; runs trained earlier lack the field.
+- **E3 cells (P6):** the four input conditions, knock G/R/M, destroy M and the six band cells, on in-domain, Pz-Oz and sc2st. The age-shift checkpoints (P5) are not in P6, which names the P1 to P3 checkpoints.
+- **Run names** keep the E1 pattern (`e1_<arm>_cv<f>_s<s>`, `e1_<arm>_<protocol>_s<s>`). E2 and E4 variants are `e2_cascade2_{dp0.5,cw0,cw1}_*`, `e4_cascade2_placebo_n1w{1.5,2.0,3.0}_*`, `e4ctx0_*` and `e4_cascade2_ntarget_*`.
