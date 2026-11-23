@@ -99,3 +99,10 @@ Decisions taken by Claude Code while the owner is offline (delegation of 2026-11
 - **Estimate:** 297 trainings, about 324 GPU hours of training (about 13.5 days) plus evaluation. Recorded in EXPERIMENT_PLAN section 6.
 - **Not chosen:** mixed precision or a smaller batch for the cascade only (would change the frozen recipe for one arm and confound the cascade vs raw comparison).
 - **Reversible:** yes; more seeds can be added later without changing anything already run.
+
+### 2026-11-23 - D-015: owner's revision of 23 Nov (GPU sessions, cascade2); E1 queue stopped
+- **Owner instruction (message of 2026-11-23, recorded in docs/DECISIONS.md D8):** the GPU is available in two 12-hour sessions a week; E1 is re-planned around that, with an own-rate cascade (`cascade2`, ARCHITECTURE section 9). **Blind change:** no E1 test score had been read or aggregated when the plan changed. The E1 evaluation files that exist (cascade seed 0) were written by the queue and have not been opened, printed or aggregated.
+- **Stopped 2026-11-23 23:33:** scripts/e1_queue.sh (waiting process), scripts/run_e1.sh and the running job. The running job was the sc2st evaluation of `e1_cascade_cv4_s0`, not a training: all five seed-0 `cascade` runs finished training (40 epochs each), so there was no partial training run to move to runs/_interrupted. The interrupted evaluation wrote no file. `e1_cascade_cv4_s0` therefore lacks its sc2st and lf evaluations; `e1_grm_cv0_s0` has none yet. Both are listed as pending evaluations.
+- **Kept unchanged:** `e1_cascade_cv{0..4}_s0` are the "full-rate cascade" reference for the cascade2 validation gate; `e1_grm_cv0_s0` is reused in P9.
+- **ISRUC:** the retry was cancelled. Group I goes ahead without subjects 4, 6 and 39: their .rec files never downloaded (MEGA quota); their scoring files are on disk. 547 of 550 allow-listed files are complete. The owner fetches the three files by hand (OPEN_QUESTIONS Q8).
+- **Superseded:** D-014's queue and the EXPERIMENT_PLAN section 6 E1 table (replaced by section 12).
