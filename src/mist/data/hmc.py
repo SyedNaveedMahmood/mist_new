@@ -19,7 +19,10 @@ from pathlib import Path
 
 import numpy as np
 
-from .. import EPOCH_SAMPLES, FS
+from .channels import pick_rule_channel, plan_channels
+from .edf_header import channel_info, parse_prefilter, read_header
+from .edf_signals import read_plan
+from .resample import spec, to_epochs
 from .sleepedf import labels_from_annotations
 
 STAGE_MAP = {"Sleep stage W": 0, "Sleep stage N1": 1, "Sleep stage N2": 2, "Sleep stage N3": 3, "Sleep stage R": 4}
@@ -50,19 +53,27 @@ def parse_annotations(ann, n_epochs: int) -> tuple:
     return y, ev.get("Lights off"), ev.get("Lights on")
 
 
-def read_record(psg: Path, hyp: Path, channels=EEG, l_freq: float = 0.3, h_freq: float = 35.0) -> tuple:
-    """Return (x [n_epochs, C, 3000] microvolt at 100 Hz, y, meta)."""
+def read_record(psg: Path, hyp: Path, channels=EEG) -> tuple:
+    """Return (x [n_epochs, C, 3000] microvolt at 100 Hz, y, meta).
+
+    Preprocessing is the shared phase-2 chain (resample.preprocess, D-017): native-rate
+    anti-alias low-pass, polyphase resampling to 100 Hz, 0.3-35 Hz zero-phase band-pass.
+    """
     import mne
 
-    raw = mne.io.read_raw_edf(psg, include=list(channels), preload=True, verbose="ERROR")
-    meta = {"fs_orig": float(raw.info["sfreq"]), "prefilter_hp": float(raw.info["highpass"]),
-            "prefilter_lp": float(raw.info["lowpass"])}
-    if int(round(raw.info["sfreq"])) != FS:
-        raw.resample(FS, verbose="ERROR")                     # polyphase with anti-alias filter
-    data = raw.get_data(picks=list(channels), units="uV")
-    data = mne.filter.filter_data(data, FS, l_freq, h_freq, method="fir", phase="zero", verbose="ERROR")
-    n = data.shape[1] // EPOCH_SAMPLES
-    x = data[:, : n * EPOCH_SAMPLES].reshape(len(channels), n, EPOCH_SAMPLES).transpose(1, 0, 2)
+    hdr = read_header(psg)
+    plan = plan_channels(channels)
+    data, info = read_plan(psg, plan, hdr)
+    x = to_epochs(data)
+    n = len(x)
     y, lo, lon = parse_annotations(mne.read_annotations(hyp), n)
-    meta.update(lights_off_epoch=lo, lights_on_epoch=lon, channels=[c.replace("EEG ", "") for c in channels])
-    return x.astype(np.float32), y, meta
+    names = [c for c, _ in plan]
+    pre = sorted({channel_info(hdr, c)["prefilter"] for c in channels})
+    hp_lp = [parse_prefilter(p) for p in pre]
+    rule, tier = pick_rule_channel(names)
+    meta = {**info, "prefilter_eeg": pre,
+            "prefilter_hp": min((h for h, _ in hp_lp if h is not None), default=None),
+            "prefilter_lp": min((lp for _, lp in hp_lp if lp is not None), default=None),
+            "lights_off_epoch": lo, "lights_on_epoch": lon, "channels": names,
+            "rule_channel": rule, "rule_tier": tier, "preprocessing": spec()}
+    return x, y, meta
