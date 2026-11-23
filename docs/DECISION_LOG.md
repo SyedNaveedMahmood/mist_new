@@ -79,3 +79,9 @@ Decisions taken by Claude Code while the owner is offline (delegation of 2026-11
 
 ### 2026-11-23 - D-012: G1 status label
 - **Chosen:** G1 = PASSED (VERIFIED for the pre-registered rule). The interpretation caveats (sub-2 s timing, off-distribution inputs) are stated in reports/e0.md and the registry, not used to re-decide the gate. E1 runs the full plan, which is also the more complete option.
+
+### 2026-11-23 - D-013: cascade does not fit the GPU at the frozen batch size; activation checkpointing
+- **Came up:** the first cascade timing run ran out of memory (16 GB GPU) in the first step: the shared WaveEncoder runs on 6 channel waveforms per token (about 226k waveforms per batch at the 1 s scale). `grm` peaks at 9.8 GB.
+- **Options:** (a) smaller batch; (b) mixed precision; (c) gradient accumulation; (d) activation checkpointing of the encoder in chunks.
+- **Chosen:** (d). It leaves the arithmetic unchanged (encoder has no dropout, only per-sample GroupNorm; a test checks values and gradients match), so the frozen recipe is untouched. (a) and (b) change the recipe; (c) changes how the loss is averaged over unequal scored-epoch counts. Cost: extra compute, measured in the timing run.
+- **Reversible:** yes.

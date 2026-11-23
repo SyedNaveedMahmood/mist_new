@@ -135,10 +135,23 @@ class CascadeBranch(nn.Module):
         m = torch.cat(toks, -2)
         return unit_rms(m) if normalise else m
 
+    CKPT_CHUNK = 16384                                        # waveforms per checkpointed encoder call
+
     def encode(self, m: torch.Tensor) -> torch.Tensor:
-        """[..., C, win] -> e [..., C, d]."""
+        """[..., C, win] -> e [..., C, d].
+
+        While gradients are recorded, the encoder runs in checkpointed chunks: its activations are
+        recomputed in the backward pass instead of stored. Six channels per token do not fit a 16 GB
+        GPU at the frozen batch size otherwise. The arithmetic is unchanged (the encoder has no
+        dropout and only per-sample GroupNorm), so this is a memory measure, not a recipe change."""
         lead = m.shape[:-1]
-        return self.morph(m.reshape(-1, self.fz.win)).view(*lead, -1) + self.band_emb
+        flat = m.reshape(-1, self.fz.win)
+        if torch.is_grad_enabled() and flat.shape[0] > self.CKPT_CHUNK:
+            from torch.utils.checkpoint import checkpoint
+            out = torch.cat([checkpoint(self.morph, c, use_reentrant=False) for c in flat.split(self.CKPT_CHUNK)])
+        else:
+            out = self.morph(flat)
+        return out.view(*lead, -1) + self.band_emb
 
     def codes(self, f: Factors, stats: dict, destroy_prob: float = 0.0, gen=None, destroy_bands=()) -> dict:
         """Every intermediate code of the cascade from the token factors (used by forward and the tests)."""

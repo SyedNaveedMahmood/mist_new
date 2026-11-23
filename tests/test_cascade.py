@@ -194,3 +194,14 @@ def test_cascade_trains_end_to_end_and_checkpoint_keeps_gate_means(store, tmp_pa
     real, _ = evaluate(model, ds, torch.device("cpu"))
     band, _ = evaluate(model, ds, torch.device("cpu"), destroy_bands=("sigma",))
     assert real["n"] == band["n"] > 0
+
+
+def test_checkpointed_encoder_matches_plain_encoder_values_and_gradients():
+    br = branch()
+    br.CKPT_CHUNK = 7                                         # force several chunks on a small input
+    m = torch.randn(2, 3, 6, br.fz.win)
+    e1 = br.encode(m); g1 = torch.autograd.grad(e1.square().sum(), list(br.morph.parameters()))
+    br.CKPT_CHUNK = 10 ** 9                                   # no checkpointing
+    e2 = br.encode(m); g2 = torch.autograd.grad(e2.square().sum(), list(br.morph.parameters()))
+    assert torch.allclose(e1, e2, atol=1e-5)
+    assert all(torch.allclose(a, b, atol=1e-4, rtol=1e-4) for a, b in zip(g1, g2))
