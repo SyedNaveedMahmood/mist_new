@@ -229,7 +229,7 @@ Owner's decision D8. It replaces the E1 table in section 6 and the D-014 queue. 
 ### 12.2 Gates fixed before the session
 
 - **Time:** the first `cascade2` run (fold 0, seed 0) is the timing run. Target: 30 minutes or less including its three evaluations. If slower, no redesign: report the number and let the queue fit fewer runs.
-- **Accuracy, validation only:** after `cascade2` seed 0 has 5 folds, its mean best validation macro-F1 must be within 1.0 point of the full-rate cascade on the same folds. The reference is `e1_cascade_cv{0..4}_s0`, mean 0.7634; "within" is read two-sided.
+- **Accuracy, validation only:** after `cascade2` seed 0 has 5 folds, its mean best validation macro-F1 must be within 1.0 point of the full-rate cascade on the same folds. The reference is `e1_cascade_cv{0..4}_s0`, mean 0.7634. The gate is one-sided: it fails only if `cascade2` is more than 1.0 point below the reference; being above passes (owner's correction, 2026-11-23).
   - If it fails, set `band_width` to 32 (`cascade2w32`), rerun those 5 folds and check again.
   - If that also fails, stop the `cascade2` queue and report; the GPU then runs P9.
   - No test score is read for this decision (`scripts/gate_cascade2.py` reads only `train_summary.json`).

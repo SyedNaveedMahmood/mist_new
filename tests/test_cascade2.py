@@ -154,7 +154,8 @@ def test_8_defaults_reproduce_the_section_8_cascade():
              "destroy_all": {"destroy_prob": 1.0, "gen": torch.Generator().manual_seed(5)}}
     with torch.no_grad():
         for k, kw in calls.items():
-            assert torch.equal(m(ref["x"], stats(2), **kw)[0], ref["out"][k]), k
+            # allclose, not equal: other torch builds differ by ~3e-7 (owner, 2026-11-23); bit-identical on the workstation
+            assert torch.allclose(m(ref["x"], stats(2), **kw)[0], ref["out"][k], atol=1e-5), k
 
 
 def test_forward_backward_switches_and_separate_band_encoder():

@@ -296,7 +296,7 @@ The own-rate waveform is the same band-limited waveform sampled on a coarser gri
 
 ### 9.3 Configuration
 
-`MistConfig` gains `band_rate` (`full` | `own`), `band_scales` (token lengths in s that carry band channels; `null` = every scale), `band_width` (`null` = one encoder for all channels; an integer = the band encoder's width) and `encoder_checkpoint` (D-013 activation checkpointing; on by default). The defaults reproduce the section 8 model exactly: existing checkpoints load with `strict=True` and give bit-identical outputs (test 8 compares against `tests/fixtures/cascade_v1_reference.pt`, written by the pre-revision code). The new per-channel index buffers are not saved in checkpoints.
+`MistConfig` gains `band_rate` (`full` | `own`), `band_scales` (token lengths in s that carry band channels; `null` = every scale), `band_width` (`null` = one encoder for all channels; an integer = the band encoder's width) and `encoder_checkpoint` (D-013 activation checkpointing; on by default). The defaults reproduce the section 8 model exactly: existing checkpoints load with `strict=True` and give identical outputs (bit for bit on the workstation, torch as installed there; test 8 compares with atol 1e-5 so it passes on other torch builds, which differ by about 3e-7; it compares against `tests/fixtures/cascade_v1_reference.pt`, written by the pre-revision code). The new per-channel index buffers are not saved in checkpoints.
 
 Arms: `cascade2`, `cascade2_placebo` (destroy_prob 1.0, critic 0), `cascade2_absolute` (night_relative false); `cascade2w32*` (band_width 32) exist only for the validation-gate fallback.
 
@@ -311,7 +311,7 @@ Arms: `cascade2`, `cascade2_placebo` (destroy_prob 1.0, critic 0), `cascade2_abs
 5. `rfft` of each own-rate waveform returns that channel's phasor bins and nothing else.
 6. With destroy_prob 1: same parameters as `cascade2`, and the output is identical for a token and for the same token with its phase replaced.
 7. `destroy_bands: [b]` changes only band b's channel and the broadband channel (4 s), and the broadband channel at 1 s.
-8. The defaults reproduce the section 8 cascade outputs bit for bit.
+8. The defaults reproduce the section 8 cascade outputs (atol 1e-5; bit for bit on the workstation).
 
 Plus: forward and backward with the critic, the band encoder receives gradients and has width 16, and the checkpointing switch changes neither values nor gradients. Tests 1 and 5 were checked to fail on two deliberate synthesis faults (a one-sample shift, a dropped bin). All on synthetic signals; nothing here is evidence on real EEG.
 
