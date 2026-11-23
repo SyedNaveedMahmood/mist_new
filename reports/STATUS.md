@@ -10,9 +10,9 @@
   - T6b cascade topology implemented, tested on synthetic signals only (timing still pending).
   - T9 stage-targeted critic; T8 code; E0/E1 runners; HMC reader (phase 2, code only).
   - HMC and DOD-H downloaded and verified.
+  - Sleep-EDF-20 AttnSleep replication (check only, own registry section): the published MF1 78.1 is reproduced, 78.5, under the published repo's test-epoch selection; 75.0 at the final epoch without test selection.
 - **Running:**
   - E0 (T6): raw and attnsleep, seeds 1 and 2, then all evaluations.
-  - Sleep-EDF-20 AttnSleep replication (check only), sharing the GPU with E0.
   - ISRUC group I download (resumed 2026-11-23).
 - **Session break 2026-11-22/23:** the class-weight sweep and the ISRUC retry stopped when the previous session ended. 19 of 20 sweep runs had finished. The interrupted run was retrained from scratch (partial run kept in runs/_interrupted/, D-008), and ISRUC was restarted.
 - **Plan change found on the branch:** D7 = cascade (owner relaying the supervisor, commit 175911e). The cascade is the main model; `grm` and `gr` become the topology ablation. E0 is unchanged.

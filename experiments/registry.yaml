@@ -119,3 +119,19 @@ datasets:
   dreem-dod-h: {licence: "MIT (Zenodo record licence field)", status: CONDITIONAL, url: "https://zenodo.org/records/15900394", checked: 2026-11-22, size: "dodh.zip 21,872,016,217 bytes, md5 92043c07d397d6f84aed9bd18645ab4c", note: "old S3 buckets dreem-dod-h/-o return NoSuchBucket; Zenodo is the current host per dreem-learning-open README. Whether MIT was meant to cover the data is unconfirmed. Scorer annotations: github.com/Dreem-Organization/dreem-learning-evaluation (MIT)", downloaded: "2026-11-22: md5 matched; 25 .h5 extracted (22.8 GB, __MACOSX metadata skipped); every file opens with signals+hypnogram and matches the zip size; zip deleted. VERIFIED (file integrity only; contents not yet read by project code)"}
   dreem-dod-o: {licence: "MIT (Zenodo record licence field)", status: BLOCKED, url: "https://zenodo.org/records/15900394", checked: 2026-11-22, size: "dodo.zip 36,184,521,821 bytes, md5 2908a04396c95705d14b594ff21478b3", note: "deferred until the owner frees disk. When added, EXCLUDE record 5d8e93a5-d26a-436d-bc2c-e9527dc92cbf: the 56th dod-o file, no consensus scoring (paper cohort is 55; per dreem-learning-open README)"}
   shhs: {licence: "NSRR data-use agreement", status: BLOCKED, checked: 2026-11-22, note: "local copy is a third-party redistribution; needs the owner's own NSRR agreement. Local folder <dataset>/shhs not to be read, used or deleted"}
+
+# Literature replication checks. NEVER mixed with project results (owner, 2026-11-22):
+# legacy trimmed NPZ input, published protocol, not the project store or splits.
+replication:
+  - id: replication_attnsleep_edf20
+    date: '2026-11-23'
+    commit: e8f7d65
+    script: scripts/replicate_attnsleep_edf20.py --folds 0-19 --epochs 100 --seed 123
+    data: legacy Sleep-EDF-20 Fpz-Cz NPZ (SC 00-19; no lockbox person), unscored epochs dropped, 42,308 epochs
+    protocol: 20-fold leave-one-subject-out, per-epoch AttnSleep, published recipe (Adam amsgrad, lr 1e-3 -> 1e-4 at epoch 10, wd 1e-3, batch 128, 100 epochs, class weights mu=[1.5,2,1.5,1,1.5] from training subjects, D-002)
+    evals: [runs/replication_edf20/summary.json]
+    published: {acc: 0.844, mf1: 0.781, kappa: 0.79, f1: [0.897, 0.426, 0.888, 0.902, 0.790], source: "Eldele et al., IEEE TNSRE 29 (2021) 809-818, Table V"}
+    final_epoch: {acc: 0.8098, mf1: 0.7503, kappa: 0.7417, f1: [0.862, 0.380, 0.866, 0.883, 0.761]}
+    best_test_epoch_OPTIMISTIC: {acc: 0.8378, mf1: 0.7853, kappa: 0.7791, f1: [0.890, 0.459, 0.883, 0.897, 0.796]}
+    status: VERIFIED
+    note: 'Published Table V reproduced under the published repo''s selection (epoch with best TEST accuracy per fold): MF1 78.5 vs 78.1, acc 83.8 vs 84.4. Without test selection (final epoch) MF1 is 75.0, 3.1 points below. The difference is the effect of choosing the epoch on the test fold (D-001). Weakest folds: subject 11 (final acc 0.618), 08 (0.646). 368 s/fold, run concurrently with E0 training. A check of our AttnSleep code and recipe only; not a project result.'
