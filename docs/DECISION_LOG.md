@@ -194,3 +194,13 @@ The external dev evaluation of the E0 runs goes ahead on all four datasets after
   - Tests: 5 new (dry-run failure simulation); full suite 122 passed.
 - **Restart:** the old queue was stopped without touching the running training or evaluation process. The new queue started only after that process had ended (otherwise it would treat the folder as partial), with the same end time, 2026-11-24 12:19 (deadline 12:04). Completed units are skipped automatically.
 - **Reversible:** yes.
+
+### 2026-11-24 - D-022: H1 mixed model and E3 aggregation (code only, no results)
+- **H1 mixed model:** EXPERIMENT_PLAN section 7 specifies "macro-F1 ~ arm with random intercepts for protocol, fold and seed".
+  - Implemented in-house as a REML fit with crossed random intercepts (src/mist/mixed.py, numpy/scipy). `statsmodels` is not a dependency, and the overnight limits forbid new downloads.
+  - Unit: run-level macro-F1 on the real cell, one row per (arm, protocol, fold, seed), kept only where both arms exist. Protocols: in-domain, Pz-Oz, sc2st, and both age directions.
+  - Interval: normal 95% from the GLS covariance, approximate with so few levels per factor; stated in the output.
+  - Tests: the effect is unbiased with about 95% coverage on simulated data, and the fit equals OLS when there is no grouping variance.
+  - `aggregate.py h1` labels output INTERIM, with the seeds covered. `--confirmatory` refuses unless 3 seeds x 5 folds of both arms and the age block are complete, and refuses if reports/h1_confirmatory.json exists (owner rule B7: run once).
+- **E3 band x stage:** `aggregate.py e3 --arm cascade2` gives the cost of each intervention cell (real minus intervened, paired subject bootstrap) per protocol, from the P6 files `eval_e3_*.json`.
+- Nothing was run on real results.

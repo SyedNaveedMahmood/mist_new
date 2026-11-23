@@ -328,9 +328,105 @@ def write_e1(tables, pairs, gates, out_md, out_json, seeds=None):
     Path(out_json).write_text(json.dumps({"gates": gates, "tables": tables, "pairs": pairs}, indent=1))
 
 
+
+# ----------------------------------------------------------------------------- H1 (mixed model) and E3
+H1_PROTOCOLS = {"cv": "eval_test_cv_Fpz-Cz.json", "montage": "eval_test_cv_Pz-Oz.json",
+                "sc2st": "eval_test_sc2st_Fpz-Cz.json"}
+
+
+def h1_rows(main, placebo):
+    """Run-level macro-F1 (real cell) for both arms, kept only where both arms have the (protocol, fold, seed)."""
+    import re
+    from mist import metrics
+    rows = {}
+    for arm in (main, placebo):
+        for r in e1_runs(arm, "cv"):
+            f, sd = re.search(r"_cv(\d)_s(\d+)$", r).groups()
+            for proto, fn in H1_PROTOCOLS.items():
+                if Path(r, fn).exists():
+                    cm = sum(collect([f"{r}/{fn}"], "real").values())
+                    rows[(arm, proto, int(f), int(sd))] = metrics.scores(cm)["mf1"]
+        for proto in ("young2old", "old2young"):
+            for r in e1_runs(arm, proto):
+                sd = int(r.rsplit("_s", 1)[1]); fn = f"{r}/eval_test_{proto}_Fpz-Cz.json"
+                if Path(fn).exists():
+                    rows[(arm, proto, 0, sd)] = metrics.scores(sum(collect([fn], "real").values()))["mf1"]
+    keys = sorted({k[1:] for k in rows if (main,) + k[1:] in rows and (placebo,) + k[1:] in rows})
+    return [(a, *k, rows[(a, *k)]) for k in keys for a in (main, placebo)]
+
+
+def h1_complete(rows, main):
+    have = {(p, f, s) for a, p, f, s, _ in rows if a == main}
+    need = {(p, f, s) for p in H1_PROTOCOLS for f in range(5) for s in range(3)}
+    need |= {(p, 0, s) for p in ("young2old", "old2young") for s in range(3)}
+    return need <= have
+
+
+def build_h1(main="cascade2", placebo="cascade2_placebo", confirmatory=False):
+    import numpy as np
+    from mist.mixed import fit_reml
+    rows = h1_rows(main, placebo)
+    if not rows:
+        return None
+    complete = h1_complete(rows, main)
+    if confirmatory:
+        if not complete:
+            raise SystemExit("confirmatory H1 needs 3 seeds x 5 folds of both arms and the age-shift block (owner B7)")
+        if Path("reports/h1_confirmatory.json").exists():
+            raise SystemExit("the confirmatory H1 analysis is run once only; reports/h1_confirmatory.json exists")
+    arm = np.array([1.0 if r[0] == main else 0.0 for r in rows])
+    y = np.array([r[4] for r in rows])
+    fit = fit_reml(y, np.column_stack([np.ones_like(arm), arm]),
+                   {"protocol": [r[1] for r in rows], "fold": [r[2] for r in rows], "seed": [r[3] for r in rows]})
+    out = {"pair": f"{main} - {placebo}", "label": "CONFIRMATORY" if confirmatory else "INTERIM",
+           "complete": complete, "seeds": sorted({r[3] for r in rows}), "protocols": sorted({r[1] for r in rows}),
+           "n_rows": len(rows), "effect_mf1": float(fit["beta"][1]), "se": float(fit["se"][1]),
+           "ci95": [float(v) for v in fit["ci95"][1]], "variances": fit["variances"], "converged": fit["converged"],
+           "model": "run-level macro-F1 ~ arm + (1|protocol) + (1|fold) + (1|seed), REML (src/mist/mixed.py); "
+                    "normal 95% interval, approximate with few levels per factor"}
+    if confirmatory:
+        Path("reports/h1_confirmatory.json").write_text(json.dumps(out, indent=1))
+    return out
+
+
+E3_FILES = {"cv": ("eval_test_cv_Fpz-Cz.json", "eval_e3_cv_Fpz-Cz.json"),
+            "montage": ("eval_test_cv_Pz-Oz.json", "eval_e3_cv_Pz-Oz.json"),
+            "sc2st": ("eval_test_sc2st_Fpz-Cz.json", "eval_e3_sc2st_Fpz-Cz.json")}
+
+
+def build_e3(arm, n_boot):
+    """Cost of every E3 intervention, real minus intervened, per protocol (paired subject bootstrap)."""
+    out = {}
+    for proto, (f_real, f_e3) in E3_FILES.items():
+        runs = [r for r in e1_runs(arm, "cv") if Path(r, f_real).exists() and Path(r, f_e3).exists()]
+        if not runs:
+            continue
+        real = collect([f"{r}/{f_real}" for r in runs], "real")
+        cells = json.loads(Path(runs[0], f_e3).read_text())["cells"]
+        out[proto] = {"n_runs": len(runs), "cost": {
+            c: paired_diff(real, collect([f"{r}/{f_e3}" for r in runs], c), n_boot=n_boot) for c in cells}}
+    return out
+
+
+def write_e3(arm, res, out_md):
+    bands = [c for c in next(iter(res.values()))["cost"] if "destroy_" in c and "destroy_M" not in c] if res else []
+    L = [f"# E3: band x stage (cost of destroying each band's phase), {arm}", "",
+         "Real minus intervened, points (x100), paired subject bootstrap 95% intervals. Positive = the model relies "
+         "on that band's shape. Within-database shifts; ST development-grade.", ""]
+    for proto, r in res.items():
+        L += [f"## {proto} ({r['n_runs']} runs)", "", "| intervention | macro-F1 | " + " | ".join(f"F1 {s}" for s in STAGES) + " |",
+              "| --- | ---: | " + " | ".join("---:" for _ in STAGES) + " |"]
+        for c, d in r["cost"].items():
+            L.append(f"| {c} | {fmt_ci(d['mf1'])} | " + " | ".join(fmt_ci(d[f'f1_{x}']) for x in STAGES) + " |")
+        L.append("")
+    Path(out_md).write_text("\n".join(L) + "\n")
+    return bands
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("experiment", choices=["e0", "e1"])
+    ap.add_argument("experiment", choices=["e0", "e1", "h1", "e3"])
+    ap.add_argument("--confirmatory", action="store_true", help="h1: the single confirmatory run (owner B7)")
+    ap.add_argument("--arm", default="cascade2", help="e3: arm; h1: main arm (placebo = <arm>_placebo)")
     ap.add_argument("--n-boot", type=int, default=10000)
     ap.add_argument("--seeds", default=None, help="e1: comma list, e.g. 0 for the interim seed-0 analysis")
     ap.add_argument("--out", default="reports/e1", help="e1: output stem (.md and _tables.json)")
@@ -344,6 +440,17 @@ def main():
         g1 = g1_decision(tables)
         write_e0(tables, g1, "reports/e0.md", "reports/e0_tables.json")
         print("G1", g1)
+    elif a.experiment == "h1":
+        r = build_h1(a.arm, f"{a.arm}_placebo", a.confirmatory)
+        if r is None:
+            raise SystemExit("no paired runs yet")
+        stem = "reports/h1_confirmatory" if a.confirmatory else "reports/h1_interim"
+        Path(f"{stem}.json").write_text(json.dumps(r, indent=1))
+        print(json.dumps({k: r[k] for k in ("label", "seeds", "protocols", "n_rows", "effect_mf1", "ci95")}))
+    elif a.experiment == "e3":
+        res = build_e3(a.arm, a.n_boot)
+        write_e3(a.arm, res, f"reports/e3_{a.arm}.md")
+        Path(f"reports/e3_{a.arm}.json").write_text(json.dumps(res, indent=1))
     else:
         tables, pairs = build_e1(a.n_boot)
         gates = e1_gates(pairs)

@@ -64,3 +64,52 @@ def test_e1_runs_drop_folds_skipped_by_the_session_queue(tmp_path, monkeypatch):
     (tmp_path / "runs" / "session_skips.json").write_text(json.dumps({"e1_zza_cv1_s0": "x", "e1_zzb_cv1_s0": "x"}))
     assert [Path(r).name for r in agg.e1_runs("zza", "cv")] == ["e1_zza_cv0_s0", "e1_zza_cv2_s0"]
     assert [Path(r).name for r in agg.e1_runs("zzb", "cv")] == ["e1_zzb_cv0_s0", "e1_zzb_cv2_s0"]
+
+
+def _agg_script():
+    import importlib.util
+    from pathlib import Path
+    spec = importlib.util.spec_from_file_location("agg_script", Path(__file__).resolve().parents[1] / "scripts" / "aggregate.py")
+    agg = importlib.util.module_from_spec(spec); spec.loader.exec_module(agg)
+    return agg
+
+
+def _write_eval(path, subjects, rng, cells=("real",), boost=0):
+    cm = lambda: (np.eye(5) * (60 + boost) + rng.integers(0, 12, (5, 5))).tolist()
+    d = {"night_meta": {f"{s}_1": {"subject": s, "condition": None} for s in subjects},
+         "cells": {c: {"subject_cm": {s: cm() for s in subjects}, "night_cm": {}} for c in cells}}
+    path.write_text(json.dumps(d))
+
+
+def test_h1_mixed_model_is_interim_until_complete_and_confirmatory_runs_once(tmp_path, monkeypatch):
+    import pytest
+    agg = _agg_script()
+    monkeypatch.chdir(tmp_path)
+    rng = np.random.default_rng(0)
+    for arm, boost in (("zc", 6), ("zc_placebo", 0)):
+        for s in (0, 1):
+            for f in range(5):
+                r = tmp_path / "runs" / f"e1_{arm}_cv{f}_s{s}"; r.mkdir(parents=True)
+                for fn in agg.H1_PROTOCOLS.values():
+                    _write_eval(r / fn, [f"SC:{f}{i}" for i in range(4)], rng, boost=boost)
+    out = agg.build_h1("zc", "zc_placebo")
+    assert out["label"] == "INTERIM" and not out["complete"] and out["seeds"] == [0, 1]
+    assert out["n_rows"] == 2 * 3 * 5 * 2 and out["ci95"][0] > 0          # the boosted arm is better
+    with pytest.raises(SystemExit):
+        agg.build_h1("zc", "zc_placebo", confirmatory=True)                # incomplete: refused
+
+
+def test_e3_band_by_stage_costs(tmp_path, monkeypatch):
+    agg = _agg_script()
+    monkeypatch.chdir(tmp_path)
+    rng = np.random.default_rng(1)
+    for f in range(2):
+        r = tmp_path / "runs" / f"e1_zc_cv{f}_s0"; r.mkdir(parents=True)
+        subs = [f"SC:{f}{i}" for i in range(5)]
+        for real_fn, e3_fn in agg.E3_FILES.values():
+            _write_eval(r / real_fn, subs, rng, boost=10)
+            _write_eval(r / e3_fn, subs, rng, cells=("real|destroy_sigma", "real|knock_M"))
+    res = agg.build_e3("zc", 200)
+    assert set(res) == {"cv", "montage", "sc2st"} and res["cv"]["n_runs"] == 2
+    assert res["cv"]["cost"]["real|destroy_sigma"]["mf1"]["diff"] > 0
+    assert agg.write_e3("zc", res, tmp_path / "e3.md") == ["real|destroy_sigma"]
