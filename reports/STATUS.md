@@ -14,7 +14,7 @@
 - **E0 (T6) done, G1 PASSED** (reports/e0.md). Morphology reliance (cost of the corrected `local_phase` surrogate, macro-F1): attnsleep 16.5 in-domain / 4.9 montage / 6.1 sc2st; raw 11.8 / 1.8 / -0.6 (sc2st interval spans 0). A surrogate bug (local_phase halved band power) was found by an audit after the first pass, fixed with a test, and all E0 evaluations rerun (D-011, registry `correction_e0_local_phase`).
 - **Running:**
   - **E1** (T7), serial queue scripts/e1_queue.sh: 297 trainings, about 13.5 GPU-days plus evaluation (EXPERIMENT_PLAN section 6). Started 2026-11-23 with seed 0 of cascade, cascade_placebo, cascade_absolute.
-  - ISRUC group I download (336 files on disk; 4 files failed on the last pass and are being retried).
+  - ISRUC: 547 of 550 allow-listed files complete; 3 group I .rec files (subjects 4, 6, 39) still incomplete after two passes, retry scheduled 3 h later (MEGA quota, D-007).
 - **Session break 2026-11-22/23:** the class-weight sweep and the ISRUC retry stopped when the previous session ended. 19 of 20 sweep runs had finished. The interrupted run was retrained from scratch (partial run kept in runs/_interrupted/, D-008), and ISRUC was restarted.
 - **Plan change found on the branch:** D7 = cascade (owner relaying the supervisor, commit 175911e). The cascade is the main model; `grm` and `gr` become the topology ablation. E0 is unchanged.
 - **Next:**
@@ -36,13 +36,13 @@
 | raw | 0.7523 | 0.7576 |
 | mean | 0.7373 | **0.7437** |
 
-## Downloads (free disk: 105 GB on 2026-11-23)
+## Downloads (free disk: 93 GB on 2026-11-23)
 | Dataset | State |
 | --- | --- |
 | HMC v1.1 (15.7 GB) | complete, all 456 files match SHA256SUMS, 151 recordings |
 | CAP | complete on disk, checksum-verified; nothing to download |
 | DOD-H (22.8 GB) | complete: md5 matched, 25 .h5 files open with signals + hypnogram and match the zip sizes, zip deleted. Contents not yet read by project code |
-| ISRUC I + III (16.5 GB) | group III complete (10 subjects); group I resuming from 55 of 500 files (MEGA quota, D-007) |
+| ISRUC I + III (16.5 GB) | group III complete (10 subjects); group I 497 of 500 files complete, 3 .rec files being retried (MEGA quota, D-007) |
 | DOD-O, CinC 2018 | deferred by owner (disk) |
 | DREAMS, SHHS, MASS, MESA, MrOS | not downloaded (licence / applications) |
 
