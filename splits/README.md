@@ -1,1 +1,3 @@
 `sleepedf_v1.json` is created once by `scripts/make_splits.py` after decision D1 (docs/DECISIONS.md) and then committed. It is never regenerated. A new split means a new file name and a new registry section.
+
+External datasets (phase 2): `hmc_v1.json`, `dodh_v1.json`, `isruc_v1.json`, `cap_v1.json`, made once by `scripts/make_external_splits.py` (person-level, 50/10/40 train/val/test, stratified, seed 20261124; D-017). The `test` part of each is an external holdout: `mist.data.external.load_external` refuses it without `open_holdout=True`, and `scripts/evaluate.py --dataset` cannot request it. They list dataset-qualified ids, like `sleepedf_v1.json`. Never regenerated.

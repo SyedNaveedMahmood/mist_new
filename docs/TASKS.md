@@ -26,6 +26,7 @@ Work top to bottom. Each task has an acceptance test. Do not start a task whose 
 ## Phase 2: external (start downloads during phase 1)
 
 - [ ] **T13 HMC reader and audit**, then ISRUC, DOD, CinC 2018 (training part), CAP rebuild from EDF.
+  2026-11-24: HMC, DOD-H, ISRUC (I, III), CAP readers, stores, audits (reports/external_audit_*.md), splits (splits/*_v1.json) and the guarded dev-only evaluation path done on CPU (D-017, D-018). No external evaluation run yet. CinC 2018 not started.
 - [ ] **T14 Baselines.** SleepBand re-implementation (check for released code first), magnitude/phase STFT model in the spirit of PhASER, TinySleepNet, WaveSleepNet.
 - [ ] **T15 Single-source and leave-one-dataset-out benchmark.**
 - [ ] **T16 Morphology-competence probes** on MODA / MASS-SS2 or DREAMS once access and rights are settled.
