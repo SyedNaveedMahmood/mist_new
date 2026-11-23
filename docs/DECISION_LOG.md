@@ -166,3 +166,16 @@ Stores built on CPU with scripts/prepare_external.py; splits made with scripts/m
   - **By the owner's rule, ISRUC is not evaluated.** HMC, DOD-H and CAP proceed after session 1.
 - **Split:** splits/isruc_v2.json, stratified by group and amplitude subgroup, same seed (20261124) and proportions: 54 / 11 / 42 people. Strata: group I normal 41/8/32, group I low 8/2/6, group III low 5/1/4. It is the default from now on (`external.SPLIT_VERSION`); splits/isruc_v1.json stays in place, unused. Made before any external evaluation.
 - **DOD-H is a target only,** never a training source (owner: 2 validation people are too few).
+
+### 2026-11-24 - D-020: ISRUC sub-domains (owner closes Q9, before any external evaluation)
+1. **Two sub-domains, named by reference label.** ISRUC is evaluated as ISRUC-M (81 recordings, M1/M2 labels, normal range) and ISRUC-A (26, A1/A2 labels, +/-25 uV header range).
+   - Every ISRUC table shows ISRUC-M, ISRUC-A and "all", in that order.
+   - Claims are made per sub-domain. The "all" row is shown only for comparison with papers that pool ISRUC; no claim rests on it alone.
+   - Code: `external.isruc_subdomain`, `external.ISRUC_ROWS`.
+2. **`*_absolute` arms are evaluated on ISRUC-M only.** On ISRUC-A the calibration is unknown, so their scores there are descriptive and not evidence for or against H3. This replaces the D-019 reporting rule for these arms.
+3. **Group III is entirely inside ISRUC-A.** Any statement about group III says it is confounded with the recording set-up. No healthy-versus-patient claim is made from ISRUC.
+4. **Wording in reports:** the ISRUC-A difference is "a different recording set-up or a different population; not separable from the files" (CONDITIONAL).
+5. **Open (OPEN_QUESTIONS Q10):** whether ISRUC as a training source uses ISRUC-M only or both. To be decided before any ISRUC-trained model is run.
+6. **attnsleep docstring corrected:** its input is divided by the night's robust standard deviation without mean removal; it is not z-scored.
+
+The external dev evaluation of the E0 runs goes ahead on all four datasets after session 1 ends. D-019's "ISRUC is not evaluated" is lifted by this decision.

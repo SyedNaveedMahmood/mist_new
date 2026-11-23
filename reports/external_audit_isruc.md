@@ -141,8 +141,8 @@ EEG, EOG and chin EMG are lower by a similar factor of 10 to 12; ECG is lower by
 | 16-25 Hz | +0.03 | -0.08 | 0.18 |
 | 25-35 Hz | -0.08 | **-0.28** | 0.18 |
 
-**Verdict: not a pure scale (CONDITIONAL on these three checks).**
+**Verdict: not a pure scale (CONDITIONAL on these three checks).** The difference is "a different recording set-up or a different population; not separable from the files" (CONDITIONAL; owner wording, D-020).
 - After per-night scaling, the low subgroup has relatively more 2-8 Hz power than the normal subgroup, beyond the normal between-person spread, and the difference holds within group I.
 - The scale factor differs by channel type: about 11 for EEG, EOG and EMG, 33 for ECG.
 - Most likely a different amplifier or recording set-up, with its own gain and possibly its own frequency response. A population difference cannot be excluded: the subgroups may differ in diagnosis or recording period.
-- **Following the owner's rule, ISRUC is not evaluated.** HMC, DOD-H and CAP are not affected.
+- Following the owner's rule ISRUC evaluation was first held; the owner then closed Q9 (D-020): ISRUC is evaluated as sub-domains ISRUC-M (81) and ISRUC-A (26), plus "all" for comparison with pooled papers only. Group III lies entirely inside ISRUC-A and is confounded with the set-up.

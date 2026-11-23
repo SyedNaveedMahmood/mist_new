@@ -2,7 +2,8 @@
 
 Ported from Proto-sleep `src/protosleep/attnsleep.py`, which describes itself as
 an independent reproduction of the official source. Input is one 30-s epoch at
-100 Hz, z-scored per recording by the wrapper in models/build.py.
+100 Hz, divided by the night's robust standard deviation (no mean removal) by the wrapper
+in models/build.py (EpochwiseBaseline).
 
 Before this is used as a comparator it must pass gate G0 (docs/TASKS.md, T2):
 the earlier "repository adapter" scored 0.31 macro-F1, which points to a

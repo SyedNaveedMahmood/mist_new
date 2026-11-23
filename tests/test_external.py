@@ -131,3 +131,10 @@ def test_isruc_v2_split_stratifies_by_group_and_amplitude_and_is_the_default():
     assert set(v2["strata"]) == {"ISRUC1 / normal", "ISRUC1 / low", "ISRUC3 / low"} and v2["version"] == 2
     assert v2["strata"]["ISRUC1 / low"] == {"test": 4, "val": 1, "train": 5}
     assert default_split_file("isruc").name == "isruc_v2.json" and default_split_file("hmc").name == "hmc_v1.json"
+
+
+def test_isruc_subdomains_named_by_reference_label():
+    from mist.data.external import ISRUC_ROWS, isruc_subdomain
+    assert isruc_subdomain({"phys_range": "-25..25"}) == "ISRUC-A"
+    assert isruc_subdomain({"phys_range": "-2490..2490"}) == isruc_subdomain({"phys_range": "-5013..5013"}) == "ISRUC-M"
+    assert ISRUC_ROWS == ("ISRUC-M", "ISRUC-A", "all")

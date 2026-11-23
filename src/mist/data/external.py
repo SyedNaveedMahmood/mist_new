@@ -36,6 +36,14 @@ def isruc_amplitude_subgroup(meta: dict) -> str:
     return "low" if meta.get("phys_range") == "-25..25" else "normal"
 
 
+def isruc_subdomain(meta: dict) -> str:
+    """ISRUC sub-domains named by reference label (owner, D-020): ISRUC-M (M1/M2, normal range, 81 recordings),
+    ISRUC-A (A1/A2, +/-25 uV header range, 26). Tables show ISRUC-M, ISRUC-A, then "all"."""
+    return "ISRUC-A" if isruc_amplitude_subgroup(meta) == "low" else "ISRUC-M"
+
+ISRUC_ROWS = ("ISRUC-M", "ISRUC-A", "all")
+
+
 def subject_of_folder(dataset: str, name: str) -> str:
     """Record folder name -> dataset-qualified subject id. One recording per person in all four datasets."""
     if dataset == "hmc":
