@@ -12,14 +12,15 @@
   - HMC and DOD-H downloaded and verified.
   - Sleep-EDF-20 AttnSleep replication (check only, own registry section): the published MF1 78.1 is reproduced, 78.5, under the published repo's test-epoch selection; 75.0 at the final epoch without test selection.
 - **E0 (T6) done, G1 PASSED** (reports/e0.md). Morphology reliance (cost of the corrected `local_phase` surrogate, macro-F1): attnsleep 16.5 in-domain / 4.9 montage / 6.1 sc2st; raw 11.8 / 1.8 / -0.6 (sc2st interval spans 0). A surrogate bug (local_phase halved band power) was found by an audit after the first pass, fixed with a test, and all E0 evaluations rerun (D-011, registry `correction_e0_local_phase`).
-- **Running:**
-  - **E1** (T7), serial queue scripts/e1_queue.sh: 297 trainings, about 13.5 GPU-days plus evaluation (EXPERIMENT_PLAN section 6). Started 2026-11-23 with seed 0 of cascade, cascade_placebo, cascade_absolute.
-  - ISRUC: 547 of 550 allow-listed files complete; 3 group I .rec files (subjects 4, 6, 39) still incomplete after two passes, retry scheduled 3 h later (MEGA quota, D-007).
-- **Session break 2026-11-22/23:** the class-weight sweep and the ISRUC retry stopped when the previous session ended. 19 of 20 sweep runs had finished. The interrupted run was retrained from scratch (partial run kept in runs/_interrupted/, D-008), and ISRUC was restarted.
-- **Plan change found on the branch:** D7 = cascade (owner relaying the supervisor, commit 175911e). The cascade is the main model; `grm` and `gr` become the topology ablation. E0 is unchanged.
+- **Revision 3 (owner, 2026-11-23; DECISIONS D8; blind to E1 results):** GPU only in owner-started 12-hour sessions. Main model is now the own-rate cascade `cascade2` (ARCHITECTURE section 9). T6c is implemented and passes all 88 tests: the 8 owner tests on synthetic signals, and the defaults reproduce the old cascade bit for bit. CPU dry runs of training, evaluation and the session queue all work. The first `cascade2` run in session 1 is the timing run.
+- **Stopped 2026-11-23 23:33:** the D-014 E1 queue. Kept: the five full-rate `cascade` seed-0 runs (validation-gate reference, mean best val MF1 0.7634) and `e1_grm_cv0_s0`. No partial training run existed (D-015).
+- **GPU:** idle, waiting for SESSION START. Then: `nohup scripts/session_queue.sh 1 "<end>" &` (EXPERIMENT_PLAN section 12; priority list experiments/priority.txt, P1 = cascade2 / cascade2_placebo seed 0, interleaved by fold).
+- **CPU, outside sessions:** phase 2 on the data on disk (Part 5 of the owner's message): stores, channel rule, splits, external dev evaluation of the E0 runs.
+- **ISRUC:** 547 of 550 files; group I proceeds without subjects 4, 6 and 39 (retry cancelled; owner fetches them by hand, OPEN_QUESTIONS Q8).
+- **Session break 2026-11-22/23:** the class-weight sweep and the ISRUC retry stopped when the previous session ended. The interrupted run was retrained from scratch (D-008).
 - **Next:**
-  1. When seed 0 of the decisive cascade arms is done: interim G2 check (cascade vs raw, recorded as interim; the gate is decided on all seeds).
-  2. Finish E1, write reports/e1.md, decide G2 and G3.
+  1. Session 1 (on SESSION START): P1, then the validation gate, then G2 and H1 on seed 0 as INTERIM; P2. reports/session_1.md afterwards.
+  2. Meanwhile on CPU: phase 2 stores and splits (HMC, DOD-H, ISRUC, CAP).
 
 ## Gates
 | Gate | Status | Evidence |
@@ -27,6 +28,7 @@
 | G0 data | PASSED (VERIFIED) | store manifest: SC 74 people / 146 rec / 397,832 epochs / 396,378 scored; ST 22 / 44 |
 | G0b baseline | **PASSED (VERIFIED)**: 0.7277 >= 0.70, 54 dev people, std, Fpz-Cz, seed 0, frozen recipe. The pre-fix single-fold 0.6999 is kept as history | registry `g0b_attnsleep_5fold_s0`; `t3_attnsleep_cv0_s0` + correction |
 | G1 reliance | **PASSED (VERIFIED, rule D-005)**: every stage, both models, smallest raw N2 +5.8 [+4.2, +7.6]. Effects are upper bounds on reliance (probe-fidelity caveats in reports/e0.md) | registry `g1_decision`, `e0`, `correction_e0_local_phase` |
+| Validation gate (revision 3) | NOT TESTED (session 1) | cascade2 seed 0 within 1.0 point of the full-rate cascade, validation only |
 | G2, G3 | NOT TESTED | |
 
 ## Frozen recipe (validation macro-F1, mean over 5 folds, seed 0)
@@ -47,6 +49,6 @@
 | DREAMS, SHHS, MASS, MESA, MrOS | not downloaded (licence / applications) |
 
 ## Where to look
-- docs/DECISION_LOG.md: every decision taken while the owner is offline (D-001 to D-014).
+- docs/DECISION_LOG.md: every decision taken while the owner is offline (D-001 to D-016).
 - docs/OPEN_QUESTIONS.md: items reserved for the owner or the supervisor (Q1 to Q7).
 - experiments/registry.yaml: every run and dataset.
