@@ -1,0 +1,2 @@
+# T14 phase-2 baseline: SleepBand architecture re-implemented from arXiv:2607.04851 (D-023). Not a phase-1 arm.
+model: {name: sleepband}

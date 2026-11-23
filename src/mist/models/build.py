@@ -40,6 +40,9 @@ def build_model(cfg: dict) -> nn.Module:
         net = AttnSleepBaseline()
         net.apply(init_attnsleep_weights)
         return EpochwiseBaseline(net)
+    if name == "sleepband":                 # T14 phase-2 baseline (D-023); not used in phase 1
+        from .sleepband import SleepBand
+        return SleepBand(**cfg)
     raise ValueError(f"unknown model {name!r}")
 
 

@@ -204,3 +204,10 @@ The external dev evaluation of the E0 runs goes ahead on all four datasets after
   - `aggregate.py h1` labels output INTERIM, with the seeds covered. `--confirmatory` refuses unless 3 seeds x 5 folds of both arms and the age block are complete, and refuses if reports/h1_confirmatory.json exists (owner rule B7: run once).
 - **E3 band x stage:** `aggregate.py e3 --arm cascade2` gives the cost of each intervention cell (real minus intervened, paired subject bootstrap) per protocol, from the P6 files `eval_e3_*.json`.
 - Nothing was run on real results.
+
+### 2026-11-24 - D-023: T14 SleepBand baseline is an independent re-implementation from the paper
+- **Checked first (per T14):** SleepBand (Lu, Hu, Chen; arXiv:2607.04851, v1, 6 Jul 2026). The abstract says "Code is available at https://github.com/lzcn/sleep-band"; the conclusion says "Code will be released". The repository exists but states no licence (VERIFIED from the repository page, 2026-11-24).
+- **Chosen:** re-implement the architecture from the paper text only, without cloning or reading the repository code. Copying unlicensed code is not allowed, and the overnight limits forbid new downloads. Licence clarification would need contact with the authors (reserved; OPEN_QUESTIONS Q11).
+- **Scope tonight: code and tests only, no training.** In scope: the model (learnable constant-Q Gabor filterbank, magnitude responses, spectral integration with per-band temporal convolution, mixing and gates, epoch encoder, one-layer sequence attention).
+- **Not in scope:** the paper's training scheme (mean-teacher consistency on bandwise Fourier perturbations, 50 epochs, Adam 1e-4 weight decay) differs from the frozen phase-1 recipe. Whether a phase-2 baseline uses its own published recipe or ours is a phase-2 protocol choice, made before any baseline is trained; it is not decided here.
+- Details the paper leaves open are listed in the module docstring (src/mist/models/sleepband.py). Parameters with those choices: 3,268,130 (the paper gives no absolute count to check against; UNKNOWN). Tests: tests/test_sleepband.py (filter selectivity, constant-Q width, scale invariance, gradients).
