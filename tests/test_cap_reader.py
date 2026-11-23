@@ -53,6 +53,9 @@ def test_midnight_and_refusals(tmp_path):
     assert [t for t, _ in rows] == [86370, 86400] and notes["truncated_rows"] == 1
     y, origin, _ = cap.align(rows, start_s=86340, n_seconds=120)
     assert origin == 0 and y.tolist() == [-1, 0, 1, -1]
+    long_rows = [(18 * 3600 + 30 * k, 2) for k in range(14 * 120)]      # 14 h from 18:00, past midnight
+    y, origin, notes = cap.align(long_rows, start_s=18 * 3600, n_seconds=14 * 3600)
+    assert notes["rows_before_signal"] == 0 and (y == 2).all()
     with pytest.raises(ValueError, match="before the EDF start"):
         cap.align([(36000 + 30 * k, 2) for k in range(20)], start_s=36000 + 30 * 15, n_seconds=600)
     with pytest.raises(ValueError, match="grid"):

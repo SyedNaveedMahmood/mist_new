@@ -102,8 +102,11 @@ def align(rows: list, start_s: int, n_seconds: float) -> tuple:
     """Place stage rows on a 30-s grid. -> (y, origin_s, notes)."""
     if not rows:
         raise ValueError("no stage rows")
-    off = [t - start_s for t, _ in rows]
-    off = [o - 86400 if o > 43200 else (o + 86400 if o < -43200 else o) for o in off]
+    # only the first row is wrapped to the nearest day; later rows keep their distance from it,
+    # so recordings longer than 12 h are not folded back
+    off0 = rows[0][0] - start_s
+    off0 = off0 - 86400 if off0 > 43200 else (off0 + 86400 if off0 < -43200 else off0)
+    off = [off0 + t - rows[0][0] for t, _ in rows]
     origin = off[0] % 30
     n = int((n_seconds - origin) // 30)
     y = np.full(n, -1, dtype=np.int8)
@@ -155,7 +158,8 @@ def read_record(edf: Path, txt: Path) -> tuple:
     labs = sorted({lab for _, how in plan for lab in how[1:]})
     rule_src = dict(plan)[rule][1] if rule else None
     i = hdr["label"].index(rule_src) if rule_src else None
-    meta = {**info, "group": group_of(Path(edf).stem),
+    meta = {**info, "fs_orig": info["fs_by_channel"][rule] if rule else info["fs_orig"],
+            "group": group_of(Path(edf).stem),
             "prefilter_eeg": sorted({hdr["prefilter"][hdr["label"].index(lab)] for lab in labs}),
             "phys_range": f"{hdr['pmin'][i]}..{hdr['pmax'][i]}" if i is not None else None,
             "nrec_header": hdr["nrec_header"], "nrec_file": hdr["nrec_file"],
