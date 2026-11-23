@@ -19,7 +19,7 @@ from session_queue import parse_plan, unit_done  # noqa: E402
 
 ap = argparse.ArgumentParser()
 ap.add_argument("n", type=int)
-ap.add_argument("--seeds", default=None)
+ap.add_argument("--seeds", default=None, help="comma list of seed sets separated by ';', e.g. '0;0,1'")
 ap.add_argument("--plan", default="experiments/priority.txt")
 a = ap.parse_args()
 log = Path(f"runs/logs/session_{a.n}.log").read_text().splitlines()
@@ -44,15 +44,48 @@ if gates:
         d = json.loads(g.read_text())
         L.append(f"- {d['arm']} vs {d['ref']}, seed {d['seed']}: mean best val MF1 {100 * d['mean_arm']:.2f} vs "
                  f"{100 * d['mean_ref']:.2f} ({d['diff_points']:+.2f} points, tolerance {d['tol_points']:.1f}): **{d['status']}**")
-out = "reports/e1_interim" if a.seeds else "reports/e1"
-cmd = [sys.executable, "scripts/aggregate.py", "e1", "--out", out] + (["--seeds", a.seeds] if a.seeds else [])
-subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
-body = Path(f"{out}.md").read_text().split("\n", 1)[1]
-L += ["", f"## Results ({'INTERIM, seeds ' + a.seeds if a.seeds else 'all seeds run so far'}; from {out}.md)", "",
-      body.replace("\n## ", "\n### ")]
+# minutes per run per arm and peak memory, from train_summary.json of the runs trained in this session
+import statistics
+per_arm = {}
+for l in log:
+    m = re.search(r"train (\S+): ok", l)
+    if m:
+        s_ = json.loads(Path(f"runs/{m.group(1)}/train_summary.json").read_text())
+        arm = json.loads(json.dumps(__import__("yaml").safe_load(Path(f"runs/{m.group(1)}/config.yaml").read_text())))["arm"]
+        per_arm.setdefault(arm, []).append((s_["wall_sec"] / 60, s_.get("gpu_peak_mb")))
+L += ["", "## Minutes per run per arm (training wall time from train_summary.json)", "",
+      "| arm | runs | median min | max min | peak GPU MB |", "| --- | ---: | ---: | ---: | ---: |"]
+for arm, v in per_arm.items():
+    L.append(f"| {arm} | {len(v)} | {statistics.median(x for x, _ in v):.1f} | {max(x for x, _ in v):.1f} | "
+             f"{max((p for _, p in v if p), default='')} |")
+seed_sets = a.seeds.split(";") if a.seeds else [None]
+for ss in seed_sets:
+    out = f"reports/e1_interim_s{ss.replace(',', '')}" if ss else "reports/e1"
+    cmd = [sys.executable, "scripts/aggregate.py", "e1", "--out", out] + (["--seeds", ss] if ss else [])
+    subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
+    body = Path(f"{out}.md").read_text().split("\n", 1)[1]
+    L += ["", f"## Results ({'INTERIM, seeds ' + ss if ss else 'all seeds run so far'}; from {out}.md)", "",
+          body.replace("\n## ", "\n### ")]
+r = subprocess.run([sys.executable, "scripts/aggregate.py", "h1"], capture_output=True, text=True)
+if r.returncode == 0:
+    h = json.loads(Path("reports/h1_interim.json").read_text())
+    L += ["", "## H1, mixed model (INTERIM)", "",
+          f"- {h['pair']}: {100 * h['effect_mf1']:+.2f} macro-F1 points, 95% interval "
+          f"[{100 * h['ci95'][0]:+.2f}, {100 * h['ci95'][1]:+.2f}] (approximate), seeds {h['seeds']}, protocols "
+          f"{', '.join(h['protocols'])}, {h['n_rows']} run-level rows. {h['model']}.", ""]
 units, _ = parse_plan(a.plan)
-nxt = [u for u in units if u["kind"] == "train" and not unit_done(u)][:6]
-L += ["## Next (first open units of the priority list)", ""]
-L += ["- " + " + ".join(i["name"] for i in u["items"]) for u in nxt]
+from session_queue import est_train, load_times  # noqa: E402
+times = load_times()
+nxt = [u for u in units if u["kind"] == "train" and not unit_done(u)]
+L += ["## Next (open units of the priority list, at the measured speed)", ""]
+tot = 0.0
+for u in nxt:
+    need = sum(est_train(i, times) for i in u["items"])
+    if tot + 1.3 * need > 11.75 * 3600:
+        break
+    tot += 1.3 * need
+    L.append(f"- {' + '.join(i['name'] for i in u['items'])} (about {need / 60:.0f} min)")
+L.append(f"\nThese fit one 12-hour session under the 1.3x rule: about {tot / 3600:.1f} h with the margin "
+         "(estimates are the largest measured time per arm; unmeasured arms use a conservative prior).")
 Path(f"reports/session_{a.n}.md").write_text("\n".join(L) + "\n")
 print(f"reports/session_{a.n}.md")
