@@ -10,6 +10,14 @@ Reports every (condition, intervention) cell needed by E0 and E3:
 
 --cells core keeps only the real-input cell (GPU sessions, EXPERIMENT_PLAN section 12); --cells e3
 writes every other cell to eval_e3_*.json (task P6). Default: all cells, as before.
+
+External development data (phase 2; development-grade):
+
+    python scripts/evaluate.py --run runs/<run> --dataset hmc --part dev [--channel F4-M1]
+
+loads the train+val people of splits/<dataset>_v1.json (or --part train / val). The test part is the
+external holdout and cannot be requested here. Default channel: the D-017 rule channel of each
+recording ('rule'). Output: eval_<tag>_ext-<dataset>-<part>_<channel or rule>.json in the run folder.
 """
 import argparse
 import json
@@ -19,6 +27,7 @@ import torch
 
 from mist.config import load_paths
 from mist.data import splits as S
+from mist.data.external import DATASETS, load_external
 from mist.data.store import load_cohort
 from mist.engine.loop import evaluate, load_checkpoint, make_dataset
 
@@ -32,19 +41,30 @@ def main():
     ap.add_argument("--tag", default="test")
     ap.add_argument("--view", default=None, help="evaluation window; default = training view (std). lf = label-free")
     ap.add_argument("--cells", default="all", choices=("all", "core", "e3"))
+    ap.add_argument("--dataset", default=None, choices=sorted(DATASETS), help="external dataset (phase 2)")
+    ap.add_argument("--part", default="dev", choices=("dev", "train", "val"),
+                    help="external split part; the test part is a holdout and is not available here")
+    ap.add_argument("--split-file", default=None, help="external split file; default splits/<dataset>_v1.json")
     a = ap.parse_args()
     if a.cells == "e3" and a.tag == "test":
         a.tag = "e3"
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, cfg = load_checkpoint(a.run, device)
-    protocol = a.protocol or cfg["split"]["protocol"]
-    if protocol == "lockbox" and not cfg["split"].get("i_am_running_the_final_confirmation"):
-        raise SystemExit("the lockbox is opened once, by task T12 only")
-    roles = S.resolve(S.load(cfg["split"]["file"]), protocol, cfg["split"].get("fold", 0))
-    nights = load_cohort(load_paths(a.paths)["store_root"], roles["test_cohort"], set(roles["test"]),
-                         split_file=cfg["split"]["file"],
-                         open_lockbox=protocol == "lockbox" and bool(cfg["split"].get("i_am_running_the_final_confirmation")))
-    channel = a.channel or cfg["data"]["channel"]
+    if a.dataset:
+        if a.protocol:
+            raise SystemExit("--protocol does not apply to --dataset")
+        protocol = f"ext-{a.dataset}-{a.part}"
+        nights = load_external(load_paths(a.paths)["store_root"], a.dataset, a.part, a.split_file)
+        channel = a.channel or "rule"
+    else:
+        protocol = a.protocol or cfg["split"]["protocol"]
+        if protocol == "lockbox" and not cfg["split"].get("i_am_running_the_final_confirmation"):
+            raise SystemExit("the lockbox is opened once, by task T12 only")
+        roles = S.resolve(S.load(cfg["split"]["file"]), protocol, cfg["split"].get("fold", 0))
+        nights = load_cohort(load_paths(a.paths)["store_root"], roles["test_cohort"], set(roles["test"]),
+                             split_file=cfg["split"]["file"],
+                             open_lockbox=protocol == "lockbox" and bool(cfg["split"].get("i_am_running_the_final_confirmation")))
+        channel = a.channel or cfg["data"]["channel"]
     if a.view:
         cfg["data"]["view"] = a.view          # window only; the night reference is recomputed inside it
     ds = make_dataset(nights, cfg, channel, train=False)
@@ -63,7 +83,9 @@ def main():
     elif a.cells == "e3":
         cells = cells[1:]
     out = {"protocol": protocol, "channel": channel, "n_nights": len(nights), "view": cfg["data"].get("view", "std"),
-           "cells_set": a.cells, "night_meta": {n.record_id: {"subject": n.subject, "condition": n.meta.get("condition")} for n in nights},
+           "cells_set": a.cells, "night_meta": {n.record_id: {"subject": n.subject, "condition": n.meta.get("condition"),
+                                         **({"channel": n.meta["rule_channel"] if channel == "rule" else channel}
+                                            if a.dataset else {})} for n in nights},
            "cells": {}}
     for cond, knock, destroy, bands in cells:
         key = (cond + ("" if not knock else f"|knock_{''.join(knock)}") + ("" if destroy is None else "|destroy_M")

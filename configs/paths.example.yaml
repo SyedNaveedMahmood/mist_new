@@ -6,6 +6,11 @@ raw:
   sleep_telemetry: "/home/FA006/Desktop/Sleep_dl/SLeep_edf_fulldataset/physionet.org/files/sleep-edfx/1.0.0/sleep-telemetry"
   sc_subjects_xls: "/home/FA006/Desktop/Sleep_dl/SLeep_edf_fulldataset/physionet.org/files/sleep-edfx/1.0.0/SC-subjects.xls"
   st_subjects_xls: "/home/FA006/Desktop/Sleep_dl/SLeep_edf_fulldataset/physionet.org/files/sleep-edfx/1.0.0/ST-subjects.xls"
+  # phase 2 (scripts/prepare_external.py; these are also its built-in defaults)
+  hmc:   "/home/FA006/Desktop/Dimension/dataset/hmc/hmc-sleep-staging/1.1/recordings"
+  dodh:  "/home/FA006/Desktop/Dimension/dataset/dreem_dod/dodh"
+  isruc: "/home/FA006/Desktop/Dimension/dataset/isruc"
+  cap:   "/home/FA006/Desktop/Dimension/dataset/cap/physionet.org/files/capslpdb/1.0.0"
 # canonical store written by scripts/prepare_sleepedf.py (needs roughly 12 GB for SC + ST, both channels)
 store_root: "/home/FA006/Desktop/Dimension/dataset/mist_store"
 # legacy trimmed NPZ folders: smoke tests and baseline sanity checks only

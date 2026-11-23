@@ -8,6 +8,8 @@ from torch.utils.data import Dataset
 from ..models.factorizer import Factorizer, night_reference
 from .store import Night
 
+RULE_CHANNEL = "rule"
+
 
 class NightView:
     """One night, one channel, one view, with label-free night statistics per scale."""
@@ -15,6 +17,9 @@ class NightView:
     def __init__(self, night: Night, channel: str, view: str, factorizers: list):
         self.night = night
         sl = night.view_slice(view)
+        if channel == RULE_CHANNEL:                 # external stores: the channel fixed by D-017 for this recording
+            channel = night.meta["rule_channel"]
+        self.channel = channel
         self.ch = night.channel_index(channel)
         self.start, self.stop = sl.start, sl.stop
         self.y = np.asarray(night.y[sl], dtype=np.int64)
