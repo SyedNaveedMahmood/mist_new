@@ -50,3 +50,17 @@ def test_non_n1_sum_and_restrict():
     sc = metrics.scores(cm)
     assert abs(float(scores_batch(cm)["f1_nonN1_sum"]) - (sc["f1_W"] + sc["f1_N2"] + sc["f1_N3"] + sc["f1_REM"])) < 1e-12
     assert list(restrict({"a": 1, "b": 2}, ["b"])) == ["b"]
+
+
+def test_e1_runs_drop_folds_skipped_by_the_session_queue(tmp_path, monkeypatch):
+    import importlib.util
+    from pathlib import Path
+    spec = importlib.util.spec_from_file_location("agg_script", Path(__file__).resolve().parents[1] / "scripts" / "aggregate.py")
+    agg = importlib.util.module_from_spec(spec); spec.loader.exec_module(agg)
+    monkeypatch.chdir(tmp_path)
+    for arm in ("zza", "zzb"):
+        for f in range(3):
+            (tmp_path / "runs" / f"e1_{arm}_cv{f}_s0").mkdir(parents=True)
+    (tmp_path / "runs" / "session_skips.json").write_text(json.dumps({"e1_zza_cv1_s0": "x", "e1_zzb_cv1_s0": "x"}))
+    assert [Path(r).name for r in agg.e1_runs("zza", "cv")] == ["e1_zza_cv0_s0", "e1_zza_cv2_s0"]
+    assert [Path(r).name for r in agg.e1_runs("zzb", "cv")] == ["e1_zzb_cv0_s0", "e1_zzb_cv2_s0"]

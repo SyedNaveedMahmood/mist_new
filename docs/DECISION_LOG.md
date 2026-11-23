@@ -179,3 +179,18 @@ Stores built on CPU with scripts/prepare_external.py; splits made with scripts/m
 6. **attnsleep docstring corrected:** its input is divided by the night's robust standard deviation without mean removal; it is not z-scored.
 
 The external dev evaluation of the E0 runs goes ahead on all four datasets after session 1 ends. D-019's "ISRUC is not evaluated" is lifted by this decision.
+
+### 2026-11-24 - D-021: overnight rules built into the session queue; queue restarted with the same end time
+- **Came up:** the owner's overnight message (2026-11-24 01:10) sets rules the running queue did not implement:
+  - B3: retry any failed run once; a second failure skips that fold for both arms.
+  - B5: a GPU or driver fault waits 5 minutes and retries once; if it persists, GPU work stops for the night.
+  - B1: after a second gate failure, P9 is followed by the `raw` runs of P5.
+- **Done (B4: fix on CPU, add a test, run pytest, commit, restart with the SAME end time):**
+  - scripts/session_queue.py now retries any failed training once: out of memory with encoder checkpointing (as before), a GPU or driver fault after a 5-minute wait, anything else as is.
+  - A second failure records every run of the unit in runs/session_skips.json and the walk continues; a second GPU fault stops GPU work, and no pending evaluations run.
+  - A failed evaluation is retried once.
+  - scripts/aggregate.py drops skipped runs, so a skipped fold is missing for every arm.
+  - experiments/priority.txt: the second-failure branch now ends with the six `raw` age-shift runs. The main order is unchanged.
+  - Tests: 5 new (dry-run failure simulation); full suite 122 passed.
+- **Restart:** the old queue was stopped without touching the running training or evaluation process. The new queue started only after that process had ended (otherwise it would treat the folder as partial), with the same end time, 2026-11-24 12:19 (deadline 12:04). Completed units are skipped automatically.
+- **Reversible:** yes.

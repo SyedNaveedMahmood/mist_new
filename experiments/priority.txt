@@ -465,7 +465,7 @@ train e4_cascade2w32_ntarget_cv3_s0 cascade2w32 cv split.fold=3 train.seed=0 mod
 train e4_cascade2w32_ntarget_cv4_s0 cascade2w32 cv split.fold=4 train.seed=0 model.critic_stages=[0,1,4]
 stop
 label gate_fail2
-# fallback failed: cascade2 queue stops (report to owner); GPU runs the parallel block
+# fallback failed: all cascade2 work stops (report to owner); GPU runs P9, then the raw runs of P5 (owner, 2026-11-24)
 train e1_grm_cv0_s0 grm cv split.fold=0 train.seed=0
 train e1_gr_cv0_s0 gr cv split.fold=0 train.seed=0
 train e1_grm_placebo_cv0_s0 grm_placebo cv split.fold=0 train.seed=0
@@ -481,4 +481,10 @@ train e1_grm_placebo_cv3_s0 grm_placebo cv split.fold=3 train.seed=0
 train e1_grm_cv4_s0 grm cv split.fold=4 train.seed=0
 train e1_gr_cv4_s0 gr cv split.fold=4 train.seed=0
 train e1_grm_placebo_cv4_s0 grm_placebo cv split.fold=4 train.seed=0
+train e1_raw_young2old_s0 raw age split.protocol=young2old split.fold=0 train.seed=0
+train e1_raw_old2young_s0 raw age split.protocol=old2young split.fold=0 train.seed=0
+train e1_raw_young2old_s1 raw age split.protocol=young2old split.fold=0 train.seed=1
+train e1_raw_old2young_s1 raw age split.protocol=old2young split.fold=0 train.seed=1
+train e1_raw_young2old_s2 raw age split.protocol=young2old split.fold=0 train.seed=2
+train e1_raw_old2young_s2 raw age split.protocol=old2young split.fold=0 train.seed=2
 stop

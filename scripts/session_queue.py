@@ -152,6 +152,44 @@ def record(kind, key, sec):
 
 
 SIM = None          # dry run: set of simulated outputs (nothing is written to disk)
+SIM_FAIL, SIM_KIND = {}, {}   # dry run: simulated failures per run name, and their kind (oom / gpu / other)
+SKIPS = Path("runs/session_skips.json")
+GPU_FAULT = ("cuda error", "cuda runtime error", "no cuda-capable device", "nvidia driver", "cublas_status",
+             "cudnn_status", "nvml", "cuda driver")
+
+
+def load_skips():
+    return json.loads(SKIPS.read_text()) if SKIPS.exists() else {}
+
+
+def add_skip(names, reason, dry):
+    """Owner rule B3 (2026-11-24): a run that fails twice skips that fold for BOTH arms of the pair."""
+    if dry:
+        SIM_SKIP.update({n: reason for n in names})
+        return
+    sk = load_skips()
+    sk.update({n: reason for n in names})
+    SKIPS.parent.mkdir(parents=True, exist_ok=True)
+    SKIPS.write_text(json.dumps(sk, indent=1))
+
+
+SIM_SKIP = {}
+
+
+def skipped(item):
+    return item["name"] in load_skips() or item["name"] in SIM_SKIP
+
+
+def failure_kind(name):
+    if name in SIM_KIND:
+        return SIM_KIND[name]
+    p = Path(f"runs/logs/{name}.log")
+    text = p.read_text()[-20000:].lower() if p.exists() else ""
+    if "out of memory" in text:
+        return "oom"
+    if any(k in text for k in GPU_FAULT):
+        return "gpu"
+    return "other"
 
 
 def trained(item):
@@ -170,7 +208,7 @@ def mark(path):
 
 
 def unit_done(u):
-    return all(trained(i) and all(done_eval(e) for e in i["evals"]) for i in u["items"])
+    return all(skipped(i) or (trained(i) and all(done_eval(e) for e in i["evals"])) for i in u["items"])
 
 
 # ---------------------------------------------------------------------- clock
@@ -197,6 +235,11 @@ def log(msg, clock):
 def run_cmd(cmd, logfile, clock, est):
     """Runs cmd until it ends or the deadline passes. Returns (rc, seconds); rc None = killed at deadline."""
     if clock.dry:
+        name = cmd[cmd.index("--name") + 1] if "--name" in cmd else None
+        if name and SIM_FAIL.get(name, 0) > 0:                 # dry-run failure simulation (tests)
+            SIM_FAIL[name] -= 1
+            clock.advance(60)
+            return 1, 60
         clock.advance(est)
         return 0, est
     t0 = time.time()
@@ -215,13 +258,14 @@ def run_cmd(cmd, logfile, clock, est):
 
 
 # ---------------------------------------------------------------------- steps
-def do_eval(e, clock, times, quiet_log):
+def do_eval(e, clock, times, quiet_log, retry=True):
+    """-> "ok" | "no_time" | "killed" | "failed" (a failed evaluation is retried once)."""
     if done_eval(e):
-        return True
+        return "ok"
     est = est_eval(e, times)
     if clock.left() < FACTOR * est:
         log(f"no time for eval {e['run']} {e['out']} (est {est / 60:.0f} min)", clock)
-        return False
+        return "no_time"
     cmd = [PY, "scripts/evaluate.py", "--run", e["run"], *e["args"]]
     rc, sec = run_cmd(cmd, quiet_log, clock, est)
     if rc == 0:
@@ -231,47 +275,72 @@ def do_eval(e, clock, times, quiet_log):
         record("eval_core" if core else "eval", arm_key(e.get("arm") or run_arm(e["run"])), sec)
     log(f"eval {e['run']} -> {e['out']}: {'ok' if rc == 0 else 'FAILED' if rc else 'KILLED at deadline'} "
         f"({sec / 60:.1f} min)", clock)
-    return rc == 0
+    if rc is None:
+        return "killed"
+    if rc != 0:
+        return do_eval(e, clock, times, quiet_log, retry=False) if retry else "failed"
+    return "ok"
 
 
 def do_train(item, clock, times):
+    """-> "ok" | "failed" (twice) | "gpu_fault" (twice) | "killed" | "no_time" | "eval_failed".
+
+    Owner rules (2026-11-24): out of memory -> one retry with encoder checkpointing (same arithmetic, D-013);
+    GPU or driver fault -> wait 5 minutes, one retry; any other failure -> one retry."""
     name, run = item["name"], Path("runs") / item["name"]
-    if not trained(item):
-        if run.exists():                                       # leftover of an interrupted run: keep, never reuse
-            dest = Path("runs/_interrupted") / f"{name}_{datetime.now():%Y%m%d%H%M%S}"
+
+    def set_aside(tag):
+        if run.exists() and not clock.dry:
+            dest = Path("runs/_interrupted") / f"{name}{tag}_{datetime.now():%Y%m%d%H%M%S}"
             dest.parent.mkdir(parents=True, exist_ok=True)
-            if not clock.dry:
-                shutil.move(str(run), dest)
-            log(f"moved partial {run} -> {dest}", clock)
+            shutil.move(str(run), dest)
+            log(f"moved {run} -> {dest}", clock)
+
+    if not trained(item):
+        set_aside("")                                          # leftover of an interrupted run: keep, never reuse
         cmd = [PY, "scripts/train.py", "--arm", item["arm"], "--name", name, *item["overrides"]]
         est = est_train(item, times) - sum(est_eval(e, times) for e in item["evals"])
         rc, sec = run_cmd(cmd, f"runs/logs/{name}.log", clock, est)
-        if rc not in (0, None) and not clock.dry and oom(name) and "model.encoder_checkpoint=true" not in cmd:
-            log(f"{name}: out of GPU memory; retrying once with encoder checkpointing (same arithmetic, D-013)", clock)
-            dest = Path("runs/_interrupted") / f"{name}_oom_{datetime.now():%Y%m%d%H%M%S}"
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            if run.exists():
-                shutil.move(str(run), dest)
-            rc, sec2 = run_cmd(cmd + ["model.encoder_checkpoint=true"], f"runs/logs/{name}.log", clock, est)
+        if rc not in (0, None):
+            kind = failure_kind(name)
+            set_aside(f"_{kind}")
+            if kind == "oom" and "model.encoder_checkpoint=true" not in cmd:
+                log(f"{name}: out of GPU memory; retrying once with encoder checkpointing (same arithmetic, D-013)", clock)
+                cmd = cmd + ["model.encoder_checkpoint=true"]
+            elif kind == "gpu":
+                log(f"{name}: GPU or driver fault; waiting 5 minutes, then one retry", clock)
+                if clock.dry:
+                    clock.advance(300)
+                else:
+                    time.sleep(300)
+            else:
+                log(f"{name}: failed (rc {rc}); one retry", clock)
+            if clock.left() < FACTOR * est:
+                log(f"{name}: no time left for the retry; rolls over", clock)
+                return "no_time"
+            rc, sec2 = run_cmd(cmd, f"runs/logs/{name}.log", clock, est)
             sec += sec2
+            if rc not in (0, None):
+                kind = failure_kind(name)
+                set_aside(f"_{kind}2")
+                log(f"train {name}: FAILED twice ({kind}), see runs/logs/{name}.log", clock)
+                return "gpu_fault" if kind == "gpu" else "failed"
         if rc is None:
-            dest = Path("runs/_interrupted") / f"{name}_{datetime.now():%Y%m%d%H%M%S}"
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            if run.exists():
-                shutil.move(str(run), dest)
-            log(f"train {name}: KILLED at the deadline, moved to {dest}", clock)
-            return False
-        if rc != 0:
-            log(f"train {name}: FAILED (rc {rc}), see runs/logs/{name}.log", clock)
-            return False
+            set_aside("")
+            log(f"train {name}: KILLED at the deadline", clock)
+            return "killed"
         mark(run / "train_summary.json")
         if not clock.dry:
             record("train", f"{arm_key(item['arm'])}|{item['block']}", sec)
         log(f"train {name}: ok ({sec / 60:.1f} min)", clock)
+    status = "ok"
     for e in item["evals"]:
-        if not do_eval(e, clock, load_times(), "runs/logs/session_eval.log"):
-            return False
-    return True
+        st = do_eval(e, clock, load_times(), "runs/logs/session_eval.log")
+        if st in ("no_time", "killed"):
+            return st
+        if st == "failed":
+            status = "eval_failed"
+    return status
 
 
 def oom(name):
@@ -287,7 +356,15 @@ def main():
     ap.add_argument("--now", default=None, help="simulated start time for --dry-run")
     ap.add_argument("--times", default=None, help="measured-times file (default runs/session_times.json); "
                                                    "a hypothetical file is useful with --dry-run")
+    ap.add_argument("--simulate-fail", action="append", default=[], metavar="NAME:COUNT[:KIND]",
+                    help="--dry-run only: the training NAME fails COUNT times with KIND (other | oom | gpu)")
     a = ap.parse_args()
+    for spec_ in a.simulate_fail:
+        if not a.dry_run:
+            raise SystemExit("--simulate-fail needs --dry-run")
+        parts = spec_.split(":")
+        SIM_FAIL[parts[0]] = int(parts[1])
+        SIM_KIND[parts[0]] = parts[2] if len(parts) > 2 else "other"
     global TIMES, SIM
     if a.dry_run:
         SIM = set()
@@ -299,7 +376,7 @@ def main():
     Path("runs/logs").mkdir(parents=True, exist_ok=True)
     log(f"session queue: deadline {datetime.fromtimestamp(clock.deadline):%Y-%m-%d %H:%M} "
         f"({clock.left() / 3600:.2f} h){' DRY RUN' if a.dry_run else ''}", clock)
-    i = 0
+    i, gpu_dead = 0, False
     while i < len(units):
         u = units[i]
         if u["kind"] == "stop":
@@ -317,7 +394,7 @@ def main():
         if u["kind"] == "pending":
             i += 1; continue
         if u["kind"] == "eval":
-            if not do_eval(u["items"][0], clock, load_times(), "runs/logs/session_eval.log") and not done_eval(u["items"][0]):
+            if do_eval(u["items"][0], clock, load_times(), "runs/logs/session_eval.log") in ("no_time", "killed"):
                 break
             i += 1; continue
         if unit_done(u):
@@ -328,10 +405,27 @@ def main():
             log(f"does not fit: {' + '.join(it['name'] for it in u['items'])} (needs {FACTOR} x {need / 60:.0f} min, "
                 f"{clock.left() / 60:.0f} min left); rolls over", clock)
             break
-        ok = all([do_train(it, clock, times) for it in u["items"]])
-        if not ok and clock.left() <= 0:
+        last = "ok"
+        for it in u["items"]:
+            if skipped(it):
+                continue
+            last = do_train(it, clock, times)
+            if last not in ("ok", "eval_failed"):
+                break
+        if last in ("killed", "no_time"):
             break
+        if last == "gpu_fault":
+            log("GPU fault persists after the retry: GPU work stops for the night (owner rule B5)", clock)
+            gpu_dead = True
+            break
+        if last == "failed":
+            names = [it["name"] for it in u["items"]]
+            add_skip(names, f"failed twice: {it['name']}", clock.dry)
+            log(f"fold skipped for every arm of the unit (owner rule B3): {', '.join(names)}", clock)
         i += 1
+    if gpu_dead:
+        log("session queue: done (GPU fault; no pending evaluations)", clock)
+        return
     # pending evaluations: missing evals of every trained run in the plan, then 'pending' lines
     todo = [e for u in units if u["kind"] == "train" for it in u["items"] if trained(it) for e in it["evals"]]
     todo += [u["items"][0] for u in units if u["kind"] == "pending"]
@@ -344,7 +438,8 @@ def main():
         run_trained = Path(e["run"], "train_summary.json").exists() or (SIM is not None and
                                                                         str(Path(e["run"], "train_summary.json")) in SIM)
         if not done_eval(e) and run_trained:
-            do_eval(e, clock, load_times(), "runs/logs/session_eval.log")
+            if do_eval(e, clock, load_times(), "runs/logs/session_eval.log") in ("no_time", "killed"):
+                break
     log("session queue: done", clock)
 
 

@@ -8,11 +8,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def dry(tmp_path, plan, times, start="2030-01-01 09:00", end="2030-01-01 13:00"):
+def dry(tmp_path, plan, times, start="2030-01-01 09:00", end="2030-01-01 13:00", fail=()):
     (tmp_path / "plan.txt").write_text(plan)
     (tmp_path / "times.json").write_text(json.dumps(times))
+    extra = [a for f in fail for a in ("--simulate-fail", f)]
     out = subprocess.run([sys.executable, "scripts/session_queue.py", "--end", end, "--now", start, "--dry-run",
-                          "--plan", str(tmp_path / "plan.txt"), "--times", str(tmp_path / "times.json")],
+                          "--plan", str(tmp_path / "plan.txt"), "--times", str(tmp_path / "times.json"), *extra],
                          cwd=ROOT, capture_output=True, text=True, check=True).stdout
     return out
 
@@ -41,3 +42,34 @@ def test_pair_starts_only_if_both_fit_and_order_is_kept(tmp_path):
 def test_unknown_arm_uses_a_conservative_prior(tmp_path):
     out = dry(tmp_path, "train zz_c_cv0_s0 cascade2 cv\n", {}, end="2030-01-01 12:00")
     assert "does not fit: zz_c_cv0_s0" in out            # prior = full-rate cascade time, > 2.75 h / 1.3
+
+
+PAIRS = ("train zz_a_cv0_s0 zzarm cv\n&train zz_b_cv0_s0 zzarm cv\n"
+         "train zz_a_cv1_s0 zzarm cv\n&train zz_b_cv1_s0 zzarm cv\n")
+LONG = "2030-01-01 21:00"
+
+
+def test_failed_run_is_retried_once_then_ok(tmp_path):
+    out = dry(tmp_path, PAIRS, T, end=LONG, fail=["zz_b_cv0_s0:1"])
+    assert "zz_b_cv0_s0: failed (rc 1); one retry" in out and "train zz_b_cv0_s0: ok" in out
+    assert "skipped" not in out and "train zz_b_cv1_s0: ok" in out
+
+
+def test_second_failure_skips_the_fold_for_both_arms_and_continues(tmp_path):
+    out = dry(tmp_path, PAIRS, T, end=LONG, fail=["zz_a_cv0_s0:2"])
+    assert "train zz_a_cv0_s0: FAILED twice (other)" in out
+    assert "fold skipped for every arm of the unit (owner rule B3): zz_a_cv0_s0, zz_b_cv0_s0" in out
+    assert "train zz_b_cv0_s0" not in out                      # the partner is not trained
+    assert "train zz_a_cv1_s0: ok" in out and "train zz_b_cv1_s0: ok" in out
+
+
+def test_out_of_memory_retries_with_checkpointing(tmp_path):
+    out = dry(tmp_path, PAIRS, T, end=LONG, fail=["zz_a_cv0_s0:1:oom"])
+    assert "retrying once with encoder checkpointing" in out and "train zz_a_cv0_s0: ok" in out
+
+
+def test_persistent_gpu_fault_waits_retries_once_then_stops_gpu_work(tmp_path):
+    out = dry(tmp_path, PAIRS, T, end=LONG, fail=["zz_a_cv0_s0:2:gpu"])
+    assert "GPU or driver fault; waiting 5 minutes, then one retry" in out
+    assert "GPU work stops for the night" in out and "zz_a_cv1_s0" not in out.split("GPU work stops")[1]
+    assert "no pending evaluations" in out

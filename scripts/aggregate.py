@@ -179,6 +179,10 @@ PAIRS = [("cascade2", "cascade2_placebo", "H1"), ("cascade2_placebo", "raw", "H3
 
 def e1_runs(arm, block):
     runs = _e1_runs(arm, block)
+    skips = Path("runs/session_skips.json")
+    if skips.exists():                                   # owner rule B3: a fold skipped for one arm is dropped for all
+        bad = set(json.loads(skips.read_text()))
+        runs = [r for r in runs if Path(r).name not in bad]
     if SEEDS is not None:
         runs = [r for r in runs if int(r.rsplit("_s", 1)[1]) in SEEDS]
     return runs
