@@ -15,7 +15,7 @@ External development data (phase 2; development-grade):
 
     python scripts/evaluate.py --run runs/<run> --dataset hmc --part dev [--channel F4-M1]
 
-loads the train+val people of splits/<dataset>_v1.json (or --part train / val). The test part is the
+loads the train+val people of splits/<dataset>_v<n>.json (isruc v2) (or --part train / val). The test part is the
 external holdout and cannot be requested here. Default channel: the D-017 rule channel of each
 recording ('rule'). Output: eval_<tag>_ext-<dataset>-<part>_<channel or rule>.json in the run folder.
 """
@@ -44,7 +44,7 @@ def main():
     ap.add_argument("--dataset", default=None, choices=sorted(DATASETS), help="external dataset (phase 2)")
     ap.add_argument("--part", default="dev", choices=("dev", "train", "val"),
                     help="external split part; the test part is a holdout and is not available here")
-    ap.add_argument("--split-file", default=None, help="external split file; default splits/<dataset>_v1.json")
+    ap.add_argument("--split-file", default=None, help="external split file; default: the version in use (isruc v2, others v1)")
     a = ap.parse_args()
     if a.cells == "e3" and a.tag == "test":
         a.tag = "e3"

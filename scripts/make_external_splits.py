@@ -19,26 +19,27 @@ from pathlib import Path
 import numpy as np
 
 from mist.config import load_paths
-from mist.data.external import DATASETS
+from mist.data.external import DATASETS, SPLIT_VERSION, isruc_amplitude_subgroup
 
 SEED = 20261124
 FRACTIONS = {"train": 0.5, "val": 0.1, "test": 0.4}
 
 
-def stratum(dataset: str, meta: dict) -> str:
+def stratum(dataset: str, meta: dict, version: int = 1) -> str:
     if dataset == "cap":
         return meta["group"]
     if dataset == "isruc":
-        return meta["subject"].split(":")[0]
+        g = meta["subject"].split(":")[0]
+        return g if version == 1 else f"{g} / {isruc_amplitude_subgroup(meta)}"     # v2: owner, Q9
     if dataset == "hmc":
         return " / ".join(meta.get("prefilter_eeg") or ["unknown"])
     return "all"
 
 
-def make_split(dataset: str, records: dict, seed: int = SEED) -> dict:
+def make_split(dataset: str, records: dict, seed: int = SEED, version: int = 1) -> dict:
     by = defaultdict(set)
     for meta in records.values():
-        by[stratum(dataset, meta)].add(meta["subject"])
+        by[stratum(dataset, meta, version)].add(meta["subject"])
     rng = np.random.default_rng(seed)
     parts = {"train": [], "val": [], "test": []}
     strata = {}
@@ -54,8 +55,8 @@ def make_split(dataset: str, records: dict, seed: int = SEED) -> dict:
         for k, v in cut.items():
             parts[k] += v
         strata[s] = {k: len(v) for k, v in cut.items()}
-    return {"version": 1, "dataset": dataset, "seed": seed, "unit": "person", "fractions": FRACTIONS,
-            "stratified_by": {"cap": "diagnosis group", "isruc": "group (I/III)", "hmc": "EEG prefilter field",
+    return {"version": version, "dataset": dataset, "seed": seed, "unit": "person", "fractions": FRACTIONS,
+            "stratified_by": {"cap": "diagnosis group", "isruc": "group (I/III)" if version == 1 else "group (I/III) and amplitude subgroup (header range)", "hmc": "EEG prefilter field",
                               "dodh": "none"}[dataset],
             "strata": strata, **{k: sorted(v) for k, v in parts.items()}}
 
@@ -66,15 +67,17 @@ def main():
     ap.add_argument("--paths", default="configs/paths.yaml")
     ap.add_argument("--manifest", default=None)
     ap.add_argument("--out", default=None)
+    ap.add_argument("--version", type=int, default=None, help="default: the version in use (external.SPLIT_VERSION)")
     a = ap.parse_args()
-    out = Path(a.out or f"splits/{a.dataset}_v1.json")
+    version = a.version or SPLIT_VERSION.get(a.dataset, 1)
+    out = Path(a.out or f"splits/{a.dataset}_v{version}.json")
     if out.exists():
         sys.exit(f"{out} exists; split files are made once and never overwritten")
     man = Path(a.manifest or Path(load_paths(a.paths)["store_root"]) / DATASETS[a.dataset] / "manifest.json")
     m = json.loads(man.read_text())
     if m.get("dataset") != a.dataset:
         sys.exit(f"{man} is not a {a.dataset} manifest")
-    sp = make_split(a.dataset, m["records"])
+    sp = make_split(a.dataset, m["records"], version=version)
     out.write_text(json.dumps(sp, indent=1) + "\n")
     print(out, {k: len(sp[k]) for k in ("train", "val", "test")}, sp["strata"])
 

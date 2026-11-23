@@ -1,0 +1,139 @@
+{
+ "n": {
+  "low": 26,
+  "normal": 81
+ },
+ "amplitude_median_uv": {
+  "eeg": {
+   "low": 1.4023018194666923,
+   "normal": 15.245520923335743,
+   "low_iqr": [
+    1.150051445351675,
+    1.5799921970447428
+   ],
+   "normal_iqr": [
+    13.234606803955243,
+    16.999183810749358
+   ]
+  },
+  "eog": {
+   "low": 1.3524433667596902,
+   "normal": 16.96291457834095,
+   "low_iqr": [
+    1.115882589395891,
+    1.6777532611548591
+   ],
+   "normal_iqr": [
+    14.464056494508185,
+    20.2350306457786
+   ]
+  },
+  "ecg": {
+   "low": 7.058404812593796,
+   "normal": 235.1596806108982,
+   "low_iqr": [
+    5.150162596652121,
+    8.815964876372114
+   ],
+   "normal_iqr": [
+    141.8548621840821,
+    309.0060397851357
+   ]
+  },
+  "chin": {
+   "low": 0.35913437067144904,
+   "normal": 3.4792037850681425,
+   "low_iqr": [
+    0.23622048377995275,
+    0.437337353394494
+   ],
+   "normal_iqr": [
+    2.4596068875697563,
+    5.638071433290792
+   ]
+  }
+ },
+ "ratio_normal_over_low": {
+  "eeg": 10.871782887034795,
+  "eog": 12.542421365104758,
+  "ecg": 33.31626434790478,
+  "chin": 9.687749402997303
+ },
+ "spectrum_shape": {
+  "metric": "median log10 power (rule channel, per-night scaled) low minus normal, per band; within-normal MAD",
+  "bands": {
+   "0.5-2 Hz": {
+    "low_minus_normal": 0.04198090033533495,
+    "normal_within_MAD": 0.06454326906113289
+   },
+   "2-4 Hz": {
+    "low_minus_normal": 0.1195850737799731,
+    "normal_within_MAD": 0.07707819900527844
+   },
+   "4-8 Hz": {
+    "low_minus_normal": 0.07818571800592121,
+    "normal_within_MAD": 0.10293267286294047
+   },
+   "8-12 Hz": {
+    "low_minus_normal": 0.0625096378572924,
+    "normal_within_MAD": 0.1372557431398582
+   },
+   "12-16 Hz": {
+    "low_minus_normal": 0.05306460370517062,
+    "normal_within_MAD": 0.1297512894945988
+   },
+   "16-25 Hz": {
+    "low_minus_normal": -0.023776898302663434,
+    "normal_within_MAD": 0.1838437562579914
+   },
+   "25-35 Hz": {
+    "low_minus_normal": -0.1630184450452613,
+    "normal_within_MAD": 0.182847530879397
+   }
+  }
+ },
+ "spectrum_shape_group_I_only": {
+  "n": {
+   "low_I": 16,
+   "normal_I": 81,
+   "low_III": 10
+  },
+  "bands": {
+   "0.5-2 Hz": {
+    "lowI_minus_normalI": 0.026,
+    "lowIII_minus_normalI": 0.054,
+    "normalI_MAD": 0.065
+   },
+   "2-4 Hz": {
+    "lowI_minus_normalI": 0.119,
+    "lowIII_minus_normalI": 0.124,
+    "normalI_MAD": 0.077
+   },
+   "4-8 Hz": {
+    "lowI_minus_normalI": 0.115,
+    "lowIII_minus_normalI": 0.05,
+    "normalI_MAD": 0.103
+   },
+   "8-12 Hz": {
+    "lowI_minus_normalI": 0.081,
+    "lowIII_minus_normalI": 0.059,
+    "normalI_MAD": 0.137
+   },
+   "12-16 Hz": {
+    "lowI_minus_normalI": 0.09,
+    "lowIII_minus_normalI": 0.031,
+    "normalI_MAD": 0.13
+   },
+   "16-25 Hz": {
+    "lowI_minus_normalI": 0.031,
+    "lowIII_minus_normalI": -0.075,
+    "normalI_MAD": 0.184
+   },
+   "25-35 Hz": {
+    "lowI_minus_normalI": -0.084,
+    "lowIII_minus_normalI": -0.275,
+    "normalI_MAD": 0.183
+   }
+  }
+ }
+}

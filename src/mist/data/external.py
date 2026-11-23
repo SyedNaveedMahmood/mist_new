@@ -22,8 +22,18 @@ PARTS = ("dev", "train", "val", "test")
 SPLIT_DIR = Path(__file__).resolve().parents[3] / "splits"
 
 
+# Split version in use per dataset. isruc v2 (owner, 2026-11-24, Q9): stratified by group and by amplitude
+# subgroup; splits/isruc_v1.json stays on disk, unused.
+SPLIT_VERSION = {"isruc": 2}
+
+
 def default_split_file(dataset: str) -> Path:
-    return SPLIT_DIR / f"{dataset}_v1.json"
+    return SPLIT_DIR / f"{dataset}_v{SPLIT_VERSION.get(dataset, 1)}.json"
+
+
+def isruc_amplitude_subgroup(meta: dict) -> str:
+    """'low' for the 26 recordings whose EEG header range is +/-25 uV (D-018, Q9), else 'normal'."""
+    return "low" if meta.get("phys_range") == "-25..25" else "normal"
 
 
 def subject_of_folder(dataset: str, name: str) -> str:

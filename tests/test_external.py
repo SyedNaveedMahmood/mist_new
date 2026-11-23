@@ -116,3 +116,18 @@ def test_evaluate_external_dev_with_rule_channel(ext_store, tmp_path, monkeypatc
     monkeypatch.setattr(sys, "argv", ["x", "--run", str(run), "--dataset", "hmc", "--part", "test", "--paths", str(paths)])
     with pytest.raises(SystemExit):                           # argparse rejects the holdout part
         ev.main()
+
+
+def test_isruc_v2_split_stratifies_by_group_and_amplitude_and_is_the_default():
+    from mist.data.external import default_split_file
+    mk = script("make_external_splits")
+    recs = {}
+    for g, amp, n in (("ISRUC1", "-2490..2490", 20), ("ISRUC1", "-25..25", 10), ("ISRUC3", "-25..25", 10)):
+        for i in range(n):
+            s = f"{g}:{len(recs):03d}"
+            recs[s] = {"subject": s, "phys_range": amp}
+    v1, v2 = mk.make_split("isruc", recs), mk.make_split("isruc", recs, version=2)
+    assert set(v1["strata"]) == {"ISRUC1", "ISRUC3"} and v1["version"] == 1
+    assert set(v2["strata"]) == {"ISRUC1 / normal", "ISRUC1 / low", "ISRUC3 / low"} and v2["version"] == 2
+    assert v2["strata"]["ISRUC1 / low"] == {"test": 4, "val": 1, "train": 5}
+    assert default_split_file("isruc").name == "isruc_v2.json" and default_split_file("hmc").name == "hmc_v1.json"

@@ -148,3 +148,21 @@ Stores built on CPU with scripts/prepare_external.py; splits made with scripts/m
 - **HMC:** two recordings have a rule-channel median epoch SD above 150 uV (artefact-heavy or poor contact; not verified). Kept.
 - **Labels:** ISRUC scorer 1 label counts equal the signal length for all 107 (scorer 2 differs by 7 epochs in one recording; not used). DOD-H hypnogram source (consensus or single scorer): UNKNOWN. One recording per person: HMC (dataset description, hmc.py), CAP, DOD-H and ISRUC groups I/III are CONDITIONAL on the database descriptions; nothing in the files links recordings.
 - **Practical note:** ISRUC channel names keep the source electrodes (F4-A1 vs F4-M1), so `evaluate.py --channel F4-M1` on ISRUC fails for the A-labelled recordings; the default `rule` channel works for all.
+
+### 2026-11-24 - D-019: ISRUC amplitude (owner's Q9 decision) and correction to D-018
+- **Owner's decision, before any external evaluation:** keep the 26 low-amplitude ISRUC recordings as stored, with no rescaling and no exclusion.
+- **Reporting rule:** every ISRUC table shows three rows: all, normal-range (81) and low-amplitude (26).
+  - For comparisons between gain-normalised arms, "all" is primary.
+  - For any comparison involving a `*_absolute` arm (H3), the normal-range row is primary and the low-amplitude row is descriptive only, not evidence for H3.
+- **Correction to D-018** (append-only; the D-018 text stays as written): D-018 says gain-normalised models are less affected than `raw`. That is wrong.
+  - `raw` is gain-normalised: `xraw = x / per-night robust std` (mist_grm.py).
+  - The attnsleep baseline divides its input by the same per-night robust std (build.py, EpochwiseBaseline). This is per-recording scaling without mean removal, not a z-score.
+  - The arms exposed to the anomaly are the `*_absolute` ones (`x / 50`).
+  - Checked 2026-11-24 on a synthetic night, with the input and its night statistics scaled by 1/11. Maximum relative change of the logits: `raw` 8e-7, `cascade2` 3e-7, `cascade2_absolute` 7.5e-2, `grm_absolute` 3.0e-1 (VERIFIED, synthetic, untrained weights).
+- **Pure-scale diagnostic (owner's item 4): not a pure scale** (reports/external_audit_isruc.md, last section).
+  - After per-night scaling, the low subgroup has more 2-8 Hz power than the normal subgroup, beyond the normal between-person spread, and this holds within group I.
+  - The non-EEG scale factors differ: about 11 for EEG, EOG and EMG, 33 for ECG.
+  - The headers show a different acquisition set-up: A1/A2 labels and per-channel-type ranges.
+  - **By the owner's rule, ISRUC is not evaluated.** HMC, DOD-H and CAP proceed after session 1.
+- **Split:** splits/isruc_v2.json, stratified by group and amplitude subgroup, same seed (20261124) and proportions: 54 / 11 / 42 people. Strata: group I normal 41/8/32, group I low 8/2/6, group III low 5/1/4. It is the default from now on (`external.SPLIT_VERSION`); splits/isruc_v1.json stays in place, unused. Made before any external evaluation.
+- **DOD-H is a target only,** never a training source (owner: 2 validation people are too few).
