@@ -88,7 +88,7 @@ for x, y, ss, why in EXPLORATORY_PAIRS.get(a.n, []):
     r = subprocess.run([sys.executable, "scripts/aggregate.py", "pair", "--pair", f"{x},{y}", "--seeds", ss],
                        capture_output=True, text=True, check=True)
     body = Path(f"{r.stdout.strip().splitlines()[-1]}.md").read_text()
-    L += ["", body.replace("## ", "## EXPLORATORY: ", 1), f"Why: {why} Added after the interim results; no claim rests on it.", ""]
+    L += ["", body, f"Why: {why} Added after the interim results; no claim rests on it.", ""]
 units, _ = parse_plan(a.plan)
 from session_queue import est_train, load_times  # noqa: E402
 times = load_times()

@@ -275,3 +275,9 @@ The external dev evaluation of the E0 runs goes ahead on all four datasets after
   - Unmeasured arms' core evaluations are estimated at 3x the slowest measured arm's 90th percentile, instead of 300 s.
   - CPU dry run of session 2 at measured speeds: S2-1 to S2-5 fit (S2-1 about 1.3 h); S2-6 does not start (raw young2old misses by a few minutes).
 - **Reversible:** yes. The reframing is the owner's.
+- **Addendum (same day, after the e1_cascade_cv4_s0 sc2st evaluation finished on CPU):**
+  - The owner's sc2st figure for cascade2 - cascade (-1.1 [-1.5, -0.7]) was on 4 folds. On all 5 folds it is -1.0 [-1.3, -0.6]; Pz-Oz is unchanged (5 folds already).
+  - EXPLORATORY full-rate cascade - cascade2_placebo, sc2st, on 5 folds: -0.6 [-1.2, +0.0]; in-domain and Pz-Oz as above.
+- **External dev evaluation (D2) done:**
+  - 81 CPU evaluations, no failures; reports/external_dev.md.
+  - Person counts match the splits (HMC 91, DOD-H 15, CAP 63, ISRUC v2 65 = 49 ISRUC-M + 16 ISRUC-A). No holdout person was evaluated (checked against the split files).

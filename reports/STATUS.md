@@ -12,7 +12,10 @@
 - **G2, INTERIM:** cascade2 - raw in-domain +0.6 [-0.3, +1.5], within 1.5 points.
 - **B8 leakage check** on the large shift gains of the cascade arms over raw: none found (subjects, checkpoint selection, night statistics, lf window). See the notes at the top of reports/session_1.md.
 - **Plan correction D-024 (owner):** the H1 primary statistic is the joint subject bootstrap over the four shift protocols. The mixed model is secondary. No H1 number existed before the change.
-- **CPU now:** external dev evaluation (D2): raw and attnsleep seed 0 on HMC, DOD-H, CAP and ISRUC, then cascade2 and cascade2_placebo seed 0 (INTERIM), into reports/external_dev.md. The missing e1_cascade_cv4_s0 sc2st evaluation runs last.
+- **External dev evaluation (D2) done** (reports/external_dev.md; seed 0, development-grade, holdouts closed; changes no phase-1 choice). Lead rows, macro-F1:
+  - cascade2_placebo - raw: HMC +9.7 [+8.3, +11.1], DOD-H +6.7 [+3.7, +10.0], CAP +1.3 [-0.6, +3.2], ISRUC-M +3.5 [+1.0, +5.9], ISRUC-A +4.2 [+1.5, +6.8].
+  - cascade2 - cascade2_placebo (INTERIM): HMC -3.9 [-4.8, -3.0], DOD-H -3.3 [-4.4, -2.2], CAP -1.0 [-1.7, -0.3], ISRUC-M -1.2 [-2.0, -0.4], ISRUC-A +0.8 [-0.1, +1.7].
+- **CPU now:** full-rate cascade destroy-M evaluations (15, for session-2 report item b).
 - **Revision 4 (owner, 2026-11-24; DECISIONS D9; made after the interim H1 result was seen):** research questions re-aimed at transfer (what carries over: gain, rhythm or shape; does a model restricted to it beat standard models on unseen datasets). H1 to H6 unchanged; H3 is the central claim; the confirmatory H1 runs in session 3 and is reported whatever it shows. EXPERIMENT_PLAN section 13.
 - **Recorded:** on seed 0 the own-rate cascade2 is below the full-rate cascade under shift (Pz-Oz -1.8 [-3.3, -0.6], sc2st -1.1 [-1.5, -0.7]); the in-domain revision-3 gate could not detect this. EXPLORATORY: full-rate cascade - cascade2_placebo is about zero (in-domain +0.2, Pz-Oz -0.1, sc2st -0.4; intervals span 0).
 - **New EXPLORATORY control `raw_whitened`** (raw on night-whitened tokens): code and tests done; trains in session 2.
