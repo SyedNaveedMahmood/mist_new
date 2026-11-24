@@ -113,26 +113,37 @@ def build(arms, seeds, n_boot):
     return res
 
 
+def shape_label(lo: float, hi: float, margin: float = 0.02) -> str:
+    """Owner's four-way rule on a 95% interval (fractions, not points)."""
+    if hi < 0:
+        return "negative"
+    if lo > 0:
+        return "positive"
+    return "neutral" if lo >= -margin and hi <= margin else "inconclusive"
+
+
 def shape_line(res) -> str:
     """One line for the session-2 report (owner 2026-11-24): is full-rate shape neutral or negative on the external
-    development parts? Rule fixed before any cascade external number was read: per dataset row (ISRUC-M and
-    ISRUC-A separately, not "all"), macro-F1 of cascade - cascade2_placebo is negative if the 95% interval lies
-    below 0, positive if above 0, else neutral."""
+    development parts? Rule (owner refinement, D-026 addendum) fixed before any cascade external number existed:
+    per dataset row (ISRUC-M and ISRUC-A separately, not "all"), from the 95% interval of the macro-F1 difference
+    cascade - cascade2_placebo: negative = entirely below 0; positive = entirely above 0; neutral = includes 0 and
+    lies within [-2, +2] points; inconclusive = includes 0 but reaches beyond -2 or +2. Interval and people printed."""
     parts = []
     for ds, r in res.items():
         for p in r["pairs"]:
             if p["pair"] != "cascade - cascade2_placebo" or p["row"] == "all" and ds == "isruc":
                 continue
             d = p["mf1"]
-            v = "negative" if d["hi"] < 0 else "positive" if d["lo"] > 0 else "neutral"
+            v = shape_label(d["lo"], d["hi"])
             name = p["row"] if ds == "isruc" else NAMES[ds]
             parts.append(f"{name} {v} ({100 * d['diff']:+.1f} [{100 * d['lo']:+.1f}, {100 * d['hi']:+.1f}], "
-                         f"{p['n_models']} fold models)")
+                         f"{p['n_subjects']} people, {p['n_models']} fold models)")
     if not parts:
         return ("Full-rate shape on the external development parts (cascade - cascade2_placebo, seed 0, EXPLORATORY): "
                 "NOT TESTED yet (no cascade external evaluation files).")
     return ("Full-rate shape on the external development parts (cascade - cascade2_placebo, macro-F1, seed 0, "
-            "EXPLORATORY; negative/neutral = 95% interval below 0/includes 0): " + "; ".join(parts) + ".")
+            "EXPLORATORY; negative/positive = 95% interval entirely below/above 0; neutral = includes 0 and within "
+            "+/-2 points; inconclusive = includes 0 but reaches beyond +/-2): " + "; ".join(parts) + ".")
 
 
 def role(arm, ds, row):

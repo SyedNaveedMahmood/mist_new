@@ -284,3 +284,9 @@ The external dev evaluation of the E0 runs goes ahead on all four datasets after
 - **Addition (owner, 2026-11-24, after session 2 started; CPU only):** full-rate cascade seed-0 fold models on the external development parts (real cell, D-017 to D-020 rules), pair `cascade - cascade2_placebo` per dataset, EXPLORATORY.
   - **5% rule:** a guard waits for 8 epochs of the first S2-2 training (`e1_raw_whitened_cv0_s0`), takes the mean epoch time of epochs 3-8 as baseline, starts the 20 evaluations (CPU, nice 19, 2 parallel, 4 threads each), and compares the mean of the next 6 epochs. Over 5% slower: it stops them and they run after the session. Log: runs/logs/cascade_ext_guard.log.
   - **Session-2 report line:** `scripts/external_report.py` writes one line (reports/external_dev_shape_line.txt). Rule fixed before any cascade external number was read: per dataset row (ISRUC-M and ISRUC-A separately, not "all"), macro-F1 difference is negative if the 95% interval lies below 0, positive if above, else neutral. `scripts/session_report.py 2` adds it after sections a) to f).
+- **Refinement to the report-line rule (owner, 2026-11-24, 15:58), made before any full-rate cascade external number existed** (checked at the time: 0 eval_test_ext files in runs/e1_cascade_cv*_s0; the guard had not yet started the evaluations). Per dataset row (ISRUC-M and ISRUC-A separate), from the 95% interval of the macro-F1 difference cascade - cascade2_placebo:
+  - negative: interval entirely below 0;
+  - positive: interval entirely above 0;
+  - neutral: interval includes 0 AND lies entirely within -2 to +2 points;
+  - inconclusive: interval includes 0 but reaches beyond -2 or +2.
+  - The interval and the number of people are always printed beside the label. Replaces the three-way rule above. Code: shape_label in scripts/external_report.py; test_shape_label.

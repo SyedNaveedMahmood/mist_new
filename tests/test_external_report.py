@@ -66,4 +66,12 @@ def test_shape_line(tmp_path, monkeypatch):
                 write_eval(r / f"eval_test_ext-{ds}-dev_rule.json", ds, ss, rng, boost)
     line = er.shape_line(er.build(["cascade", "cascade2_placebo"], [0], 300))
     assert "HMC negative" in line and "ISRUC-M negative" in line and "ISRUC-A negative" in line
-    assert "all " not in line and "EXPLORATORY" in line
+    assert "all " not in line and "EXPLORATORY" in line and "people" in line
+
+
+def test_shape_label():
+    """Owner's refined rule: neutral only when the interval includes 0 and lies within +/-2 points."""
+    lab = script().shape_label
+    assert lab(-0.03, -0.001) == "negative" and lab(0.001, 0.05) == "positive"
+    assert lab(-0.02, 0.02) == "neutral" and lab(-0.015, 0.004) == "neutral"
+    assert lab(-0.025, 0.01) == "inconclusive" and lab(-0.01, 0.021) == "inconclusive"
