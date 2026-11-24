@@ -164,7 +164,14 @@ Time per run is unknown until T3 measures it on the workstation. If a run exceed
 
 - Unit of analysis: the test subject. Nights of one person are pooled first.
 - Pairwise claims: paired subject bootstrap, 10,000 resamples, 95% percentile interval (`scripts/compare.py`), on seed-averaged predictions.
-- Pooled shift effect (H1): linear mixed model, macro-F1 ~ arm with random intercepts for protocol, fold and seed.
+- Pooled shift effect (H1), primary statistic (plan correction 2026-11-24, DECISION_LOG D-024; replaces the run-level mixed model, which contradicted the first rule above):
+  - Protocols: the four shifts only, Fpz-Cz to Pz-Oz (montage), `sc2st`, `young2old`, `old2young`. In-domain is reported beside them, not pooled.
+  - Per protocol: main arm minus its placebo (`cascade2` - `cascade2_placebo`) by the paired subject bootstrap above, each person's confusion matrices summed over folds and seeds. Only (fold, seed) runs present for both arms enter.
+  - Pooled: the equal-weight mean of the four per-protocol macro-F1 differences. Interval: one joint bootstrap, 10,000 resamples, over people in two strata (the 54 SC development people; the 22 ST people). Each resample recomputes all four protocol effects with the same draw, so a person who is a test subject in several protocols (montage and an age shift) moves together. 95% percentile interval; the two-sided bootstrap p-value enters the Holm correction.
+  - Decision rule unchanged: supported when the pooled gain is at least 2 macro-F1 points and the interval excludes 0.
+  - Run once only (`scripts/aggregate.py h1 --confirmatory`, which writes `reports/h1_confirmatory.json` and refuses a second run), and only when 3 seeds x 5 folds of both arms and the age-shift block (P5) are complete. Before that every H1 number is INTERIM, with the seeds covered, and uses the same per-protocol and pooled statistics.
+  - Tested on simulated people re-tested by several seeds: the known effect is recovered and coverage is near 95% (`tests/test_h1_bootstrap.py`).
+- Secondary H1 analysis: the linear mixed model, run-level macro-F1 ~ arm with random intercepts for protocol, fold and seed, shift protocols only (`src/mist/mixed.py`). It describes variability over seeds and folds on the same people; its rows are not independent people, and no claim rests on it.
 - Six confirmatory hypotheses; Holm correction across them. Everything else is labelled exploratory.
 - Smallest effect of interest: 2 macro-F1 points for H1, 1 point for H3.
 - With 54 dev people and about 11 test people per fold, intervals will be wide. A null result here is weak evidence; say so.
@@ -233,7 +240,7 @@ Owner's decision D8. It replaces the E1 table in section 6 and the D-014 queue. 
   - If it fails, set `band_width` to 32 (`cascade2w32`), rerun those 5 folds and check again.
   - If that also fails, stop the `cascade2` queue and report; the GPU then runs P9.
   - No test score is read for this decision (`scripts/gate_cascade2.py` reads only `train_summary.json`).
-- G2 (section 11 rule): `cascade2` within 1.5 points of `raw`, in-domain. H1 = `cascade2` - `cascade2_placebo`, **pooled over the protocols actually run** (in-domain, Pz-Oz, sc2st, the age shift); this was fixed before any E1 test score was read. After P1, G2 and H1 are reported on seed 0 as INTERIM (`aggregate.py e1 --seeds 0`); H1 becomes confirmatory on 3 seeds (P3).
+- G2 (section 11 rule): `cascade2` within 1.5 points of `raw`, in-domain. H1 = `cascade2` - `cascade2_placebo`, pooled over the four shift protocols by the statistic in section 7 (in-domain reported beside, not pooled; corrected 2026-11-24, D-024, before any H1 number was computed on real runs). The original "pooled over the protocols actually run" was fixed before any E1 test score was read. After P1, G2 and H1 are reported on seed 0 as INTERIM (`aggregate.py e1 --seeds 0`, `aggregate.py h1 --seeds 0`); H1 becomes confirmatory on 3 seeds (P3).
 
 ### 12.3 Priority list (walked in order; what does not fit rolls over)
 

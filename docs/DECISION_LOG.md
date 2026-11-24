@@ -211,3 +211,29 @@ The external dev evaluation of the E0 runs goes ahead on all four datasets after
 - **Scope tonight: code and tests only, no training.** In scope: the model (learnable constant-Q Gabor filterbank, magnitude responses, spectral integration with per-band temporal convolution, mixing and gates, epoch encoder, one-layer sequence attention).
 - **Not in scope:** the paper's training scheme (mean-teacher consistency on bandwise Fourier perturbations, 50 epochs, Adam 1e-4 weight decay) differs from the frozen phase-1 recipe. Whether a phase-2 baseline uses its own published recipe or ours is a phase-2 protocol choice, made before any baseline is trained; it is not decided here.
 - Details the paper leaves open are listed in the module docstring (src/mist/models/sleepband.py). Parameters with those choices: 3,268,130 (the paper gives no absolute count to check against; UNKNOWN). Tests: tests/test_sleepband.py (filter selectivity, constant-Q width, scale invariance, gradients).
+
+### 2026-11-24 - D-024: plan correction, H1 primary statistic (owner)
+- **Fault (owner):** EXPERIMENT_PLAN section 7 named a run-level mixed model as the pooled H1 analysis. That contradicts its own first rule (the unit of analysis is the test subject): runs of different seeds and folds re-test the same people, so run-level rows are not independent. D-022 implemented the plan as written.
+- **Corrected section 7:**
+  - Primary H1 statistic. Protocols: the four shifts only (montage, sc2st, young2old, old2young); in-domain is reported beside them, not pooled.
+  - Per protocol: `cascade2` - `cascade2_placebo` by the paired subject bootstrap, with subject confusion matrices summed over folds and seeds, on balanced (fold, seed) pairs.
+  - Pooled: the equal-weight mean of the four per-protocol macro-F1 differences.
+  - Interval: one joint bootstrap, 10,000 resamples, over people in two strata (the 54 SC development people, the 22 ST people). Every resample recomputes all four effects, so a person tested in several protocols moves together. 95% percentile interval; the two-sided bootstrap p feeds Holm.
+  - Decision rule unchanged: pooled gain >= 2 points and the interval excludes 0.
+  - The mixed model stays as a secondary analysis, shift protocols only, described as "variability over seeds and folds on the same people". No claim rests on it.
+  - The run-once lock (reports/h1_confirmatory.json) and the completeness check (3 seeds x 5 folds of both arms plus P5) moved to the primary statistic.
+  - Interim tables use the same statistics, labelled INTERIM with the seeds covered.
+- **Code:**
+  - `mist.aggregate.joint_shift_bootstrap`.
+  - `scripts/aggregate.py h1 [--seeds]` writes reports/h1_interim[_sS].md/.json.
+  - `scripts/session_report.py` now shows the H1 primary statistic per seed set instead of the mixed model.
+  - EXPERIMENT_PLAN section 12.2 had pooled over "the protocols actually run" including in-domain; corrected to match.
+- **Tests:**
+  - tests/test_h1_bootstrap.py, simulated people with a lasting ability and a lasting response to the arm, re-tested by 3 seeds. The known population effect is recovered (estimate within 1 point); coverage of the pooled 95% interval was 95.8% over 120 replicates (test runs 300 replicates and requires 92-98%).
+  - tests/test_aggregate.py covers the interim, complete and run-once paths and balanced pairing.
+- **Was any H1 number computed or read before this change? No.**
+  - No H1, E1 or G2 statistic has been computed on real runs. `aggregate.py e1`/`h1` and `session_report.py` were run only on synthetic data (tests; one synthetic dry run in the scratchpad, 2026-11-23).
+  - The session queue log records only ok/failed and minutes. One cascade2 test-evaluation file (e1_cascade2_cv0_s0, sc2st) was opened today only to list its subject identifiers and cell names, to write this code. No score in it was read.
+  - The only cascade2 numbers seen are validation scores (timing run, the gate). Those are allowed.
+- The session queue was not affected and was not restarted.
+- **Reversible:** yes (plan text and code).

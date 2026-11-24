@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import numpy as np
 
@@ -81,22 +82,67 @@ def _write_eval(path, subjects, rng, cells=("real",), boost=0):
     path.write_text(json.dumps(d))
 
 
-def test_h1_mixed_model_is_interim_until_complete_and_confirmatory_runs_once(tmp_path, monkeypatch):
+def _h1_tree(tmp_path, agg, seeds, rng):
+    import shutil
+    root = Path(__file__).resolve().parents[1]
+    (tmp_path / "splits").mkdir(exist_ok=True)
+    shutil.copy(root / "splits" / "sleepedf_v1.json", tmp_path / "splits")
+    sp = json.loads((root / "splits" / "sleepedf_v1.json").read_text())
+    for arm, boost in (("zc", 6), ("zc_placebo", 0)):
+        for s in seeds:
+            for f in range(5):
+                r = tmp_path / "runs" / f"e1_{arm}_cv{f}_s{s}"; r.mkdir(parents=True, exist_ok=True)
+                _write_eval(r / "eval_test_cv_Fpz-Cz.json", sp["folds"][f], rng, boost=boost)
+                _write_eval(r / "eval_test_cv_Pz-Oz.json", sp["folds"][f], rng, boost=boost)
+                _write_eval(r / "eval_test_sc2st_Fpz-Cz.json", sp["st"], rng, boost=boost)
+            for proto, band in (("young2old", "old"), ("old2young", "young")):
+                r = tmp_path / "runs" / f"e1_{arm}_{proto}_s{s}"; r.mkdir(parents=True, exist_ok=True)
+                _write_eval(r / f"eval_test_{proto}_Fpz-Cz.json", sp["sets"][band], rng, boost=boost)
+
+
+def test_h1_primary_statistic_interim_complete_and_run_once(tmp_path, monkeypatch):
     import pytest
     agg = _agg_script()
     monkeypatch.chdir(tmp_path)
     rng = np.random.default_rng(0)
-    for arm, boost in (("zc", 6), ("zc_placebo", 0)):
-        for s in (0, 1):
-            for f in range(5):
-                r = tmp_path / "runs" / f"e1_{arm}_cv{f}_s{s}"; r.mkdir(parents=True)
-                for fn in agg.H1_PROTOCOLS.values():
-                    _write_eval(r / fn, [f"SC:{f}{i}" for i in range(4)], rng, boost=boost)
-    out = agg.build_h1("zc", "zc_placebo")
-    assert out["label"] == "INTERIM" and not out["complete"] and out["seeds"] == [0, 1]
-    assert out["n_rows"] == 2 * 3 * 5 * 2 and out["ci95"][0] > 0          # the boosted arm is better
+    _h1_tree(tmp_path, agg, (0, 1), rng)
+    out = agg.build_h1("zc", "zc_placebo", n_boot=300)
+    assert out["label"] == "INTERIM" and not out["complete"] and out["seeds"] == [0, 1] and out["decision"] is None
+    assert out["protocols"] == ["montage", "sc2st", "young2old", "old2young"]          # in-domain is not pooled
+    assert out["in_domain_beside"]["n_runs_per_arm"] == 10
+    per = out["per_protocol"]
+    assert per["sc2st"]["n_subjects"] == 22 and per["montage"]["n_subjects"] == 54 and per["montage"]["n_runs_per_arm"] == 10
+    want = np.mean([per[p]["mf1"]["diff"] for p in out["protocols"]])
+    assert abs(out["pooled"]["diff"] - want) < 1e-12 and out["pooled"]["lo"] > 0     # boosted arm is better
+    assert out["secondary_mixed_model"]["n_rows"] == 2 * (2 * 5 * 2 + 2 * 2)          # shift protocols only
+    agg.write_h1(out, tmp_path / "h1.md")
+    assert "INTERIM" in (tmp_path / "h1.md").read_text()
     with pytest.raises(SystemExit):
-        agg.build_h1("zc", "zc_placebo", confirmatory=True)                # incomplete: refused
+        agg.build_h1("zc", "zc_placebo", confirmatory=True, n_boot=300)                # incomplete: refused
+    assert not agg.H1_CONFIRMATORY.exists()
+    agg.SEEDS = {0}
+    try:
+        assert agg.build_h1("zc", "zc_placebo", n_boot=100)["seeds"] == [0]
+    finally:
+        agg.SEEDS = None
+    _h1_tree(tmp_path, agg, (2,), rng)
+    (tmp_path / "reports").mkdir()
+    out = agg.build_h1("zc", "zc_placebo", confirmatory=True, n_boot=300)
+    assert out["complete"] and out["label"] == "CONFIRMATORY" and agg.H1_CONFIRMATORY.exists()
+    assert out["decision"]["supported"] == (out["pooled"]["diff"] >= 0.02 and out["pooled"]["lo"] > 0)
+    with pytest.raises(SystemExit):
+        agg.build_h1("zc", "zc_placebo", confirmatory=True, n_boot=300)                # run once only
+
+
+def test_h1_pairs_are_balanced(tmp_path, monkeypatch):
+    agg = _agg_script()
+    monkeypatch.chdir(tmp_path)
+    rng = np.random.default_rng(2)
+    _h1_tree(tmp_path, agg, (0,), rng)
+    import shutil
+    shutil.rmtree(tmp_path / "runs" / "e1_zc_placebo_cv3_s0")                       # placebo fold 3 missing
+    out = agg.build_h1("zc", "zc_placebo", n_boot=100)
+    assert out["per_protocol"]["montage"]["n_runs_per_arm"] == 4 and out["per_protocol"]["montage"]["n_subjects"] == 54 - 11
 
 
 def test_e3_band_by_stage_costs(tmp_path, monkeypatch):

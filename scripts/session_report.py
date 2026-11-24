@@ -66,13 +66,12 @@ for ss in seed_sets:
     body = Path(f"{out}.md").read_text().split("\n", 1)[1]
     L += ["", f"## Results ({'INTERIM, seeds ' + ss if ss else 'all seeds run so far'}; from {out}.md)", "",
           body.replace("\n## ", "\n### ")]
-r = subprocess.run([sys.executable, "scripts/aggregate.py", "h1"], capture_output=True, text=True)
-if r.returncode == 0:
-    h = json.loads(Path("reports/h1_interim.json").read_text())
-    L += ["", "## H1, mixed model (INTERIM)", "",
-          f"- {h['pair']}: {100 * h['effect_mf1']:+.2f} macro-F1 points, 95% interval "
-          f"[{100 * h['ci95'][0]:+.2f}, {100 * h['ci95'][1]:+.2f}] (approximate), seeds {h['seeds']}, protocols "
-          f"{', '.join(h['protocols'])}, {h['n_rows']} run-level rows. {h['model']}.", ""]
+for ss in seed_sets:      # H1 primary statistic (EXPERIMENT_PLAN section 7, D-024), INTERIM per seed set
+    cmd = [sys.executable, "scripts/aggregate.py", "h1"] + (["--seeds", ss] if ss else [])
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode == 0:
+        body = Path(f"{r.stdout.strip().splitlines()[-1]}.md").read_text()
+        L += ["", body.replace("\n## ", "\n### ").replace("# H1", "## H1", 1)]
 units, _ = parse_plan(a.plan)
 from session_queue import est_train, load_times  # noqa: E402
 times = load_times()

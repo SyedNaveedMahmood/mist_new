@@ -78,3 +78,52 @@ def restrict(cms: dict, subjects) -> dict:
     """Keep only the given subjects (e.g. the old age band inside cv results)."""
     subjects = set(subjects)
     return {k: v for k, v in cms.items() if k in subjects}
+
+
+def joint_shift_bootstrap(cms_a: dict, cms_b: dict, strata, n_boot: int = 10000, seed: int = 0,
+                          metric: str = "mf1") -> dict:
+    """Primary H1 statistic (EXPERIMENT_PLAN section 7): equal-weight mean over protocols of a - b.
+
+    cms_a, cms_b: {protocol: {subject: summed cm}}, the same subjects for both arms within a protocol.
+    strata: lists of people; each bootstrap resample draws every stratum with replacement once and that
+    one draw is applied to all protocols, so a person tested in several protocols moves together.
+    Returns per-protocol differences (marginals of the joint resample) and the pooled mean, with 95%
+    percentile intervals and a two-sided bootstrap p-value for the pooled effect (for Holm).
+    """
+    protos = list(cms_a)
+    if sorted(protos) != sorted(cms_b) or not protos:
+        raise ValueError("both arms need the same, non-empty set of protocols")
+    people = [s for st in strata for s in st]
+    if len(set(people)) != len(people):
+        raise ValueError("strata overlap")
+    col = {s: i for i, s in enumerate(people)}
+    rng = np.random.default_rng(seed)
+    W = np.zeros((n_boot, len(people)))
+    off = 0
+    for st in strata:
+        idx = rng.integers(0, len(st), (n_boot, len(st)))
+        np.add.at(W, (np.arange(n_boot)[:, None], off + idx), 1)
+        off += len(st)
+    per, boot = {}, []
+    for p in protos:
+        subs = sorted(cms_a[p])
+        if subs != sorted(cms_b[p]):
+            raise ValueError(f"{p}: paired comparison needs identical subject sets")
+        missing = [s for s in subs if s not in col]
+        if missing:
+            raise ValueError(f"{p}: subjects outside every stratum: {missing[:3]}")
+        A = np.stack([cms_a[p][s] for s in subs]); B = np.stack([cms_b[p][s] for s in subs])
+        w = W[:, [col[s] for s in subs]]
+        d = (scores_batch(np.einsum("bs,sij->bij", w, A))[metric]
+             - scores_batch(np.einsum("bs,sij->bij", w, B))[metric])
+        point = float(scores_batch(A.sum(0))[metric] - scores_batch(B.sum(0))[metric])
+        lo, hi = np.nanpercentile(d, [2.5, 97.5])
+        per[p] = {"diff": point, "lo": float(lo), "hi": float(hi), "n_subjects": len(subs)}
+        boot.append(d)
+    pooled_boot = np.mean(boot, 0)          # nan if a resample left a protocol empty (vanishingly rare)
+    pooled_boot = pooled_boot[np.isfinite(pooled_boot)]
+    point = float(np.mean([per[p]["diff"] for p in protos]))
+    lo, hi = np.percentile(pooled_boot, [2.5, 97.5])
+    p_boot = float(min(1.0, 2 * min((pooled_boot <= 0).mean(), (pooled_boot >= 0).mean())))
+    return {"per_protocol": per, "pooled": {"diff": point, "lo": float(lo), "hi": float(hi), "p_boot": p_boot,
+            "n_boot_used": int(pooled_boot.size)}, "protocols": protos, "strata_sizes": [len(s) for s in strata]}
