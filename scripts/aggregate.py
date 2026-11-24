@@ -205,36 +205,50 @@ def e1_cells(arm, sp):
         paths = [f"{r}/{fname}" for r in e1_runs(arm, block) if Path(f"{r}/{fname}").exists()]
         if not paths:
             return None, 0
+        get.last = (paths, nights_cond)
         return collect(paths, "real", night_subset(paths, nights_cond)), len(paths)
     out = {}
+    get.last = None
     cv, n = get("cv", "eval_test_cv_Fpz-Cz.json")
     if cv:
-        out["cv"] = {"cms": cv, "oracle": None, "n": n, "label": "in-domain (cv, Fpz-Cz, std)"}
+        out["cv"] = {"cms": cv, "src": get.last, "oracle": None, "n": n, "label": "in-domain (cv, Fpz-Cz, std)"}
     pz, n = get("cvpz", "eval_test_cv_Pz-Oz.json")
     if pz:
-        out["cvpz"] = {"cms": pz, "oracle": None, "n": n, "label": "in-domain, trained and tested on Pz-Oz"}
+        out["cvpz"] = {"cms": pz, "src": get.last, "oracle": None, "n": n, "label": "in-domain, trained and tested on Pz-Oz"}
     m, n = get("cv", "eval_test_cv_Pz-Oz.json")
     if m:
-        out["montage"] = {"cms": m, "oracle": pz, "n": n, "label": "montage: train Fpz-Cz, test Pz-Oz (oracle: Pz-Oz cv)"}
+        out["montage"] = {"cms": m, "src": get.last, "oracle": pz, "n": n, "label": "montage: train Fpz-Cz, test Pz-Oz (oracle: Pz-Oz cv)"}
     mr, n = get("cvpz", "eval_test_cv_Fpz-Cz.json")
     if mr:
-        out["montage_rev"] = {"cms": mr, "oracle": cv, "n": n, "label": "montage reverse: train Pz-Oz, test Fpz-Cz (oracle: Fpz-Cz cv)"}
+        out["montage_rev"] = {"cms": mr, "src": get.last, "oracle": cv, "n": n, "label": "montage reverse: train Pz-Oz, test Fpz-Cz (oracle: Fpz-Cz cv)"}
     for key, cond, lab in (("sc2st", None, "all ST nights"), ("sc2st_placebo", "placebo", "ST placebo nights"),
                            ("sc2st_temazepam", "temazepam", "ST temazepam nights")):
         c, n = get("cv", "eval_test_sc2st_Fpz-Cz.json", cond)
         if c:
-            out[key] = {"cms": c, "oracle": None, "n": n, "label": f"cohort shift sc2st, {lab} (no oracle)"}
+            out[key] = {"cms": c, "src": get.last, "oracle": None, "n": n, "label": f"cohort shift sc2st, {lab} (no oracle)"}
     for p, band in (("young2old", "old"), ("old2young", "young")):
         c, n = get(p, f"eval_test_{p}_Fpz-Cz.json")
         if c:
             orc = restrict(cv, sp["sets"][band]) if cv else None
-            out[p] = {"cms": c, "oracle": orc, "n": n, "label": f"age shift {p} (oracle: cv restricted to the {band} band)"}
+            out[p] = {"cms": c, "src": get.last, "oracle": orc, "n": n, "label": f"age shift {p} (oracle: cv restricted to the {band} band)"}
     for key, fname, lab in (("cv_lf", "eval_test_cv_Fpz-Cz_lf.json", "in-domain, lf window"),
                             ("sc2st_lf", "eval_test_sc2st_Fpz-Cz_lf.json", "sc2st, lf window")):
         c, n = get("cv", fname)
         if c:
-            out[key] = {"cms": c, "oracle": None, "n": n, "label": lab + " (sensitivity)"}
+            out[key] = {"cms": c, "src": get.last, "oracle": None, "n": n, "label": lab + " (sensitivity)"}
     return out
+
+
+def balanced_cms(src_a, src_b):
+    """Pairs use only the (fold, seed) runs both arms have, so seeds and folds are balanced between the arms."""
+    (pa, cond), (pb, _) = src_a, src_b
+    ka = {_run_key(str(Path(p).parent)): p for p in pa}
+    kb = {_run_key(str(Path(p).parent)): p for p in pb}
+    common = sorted(set(ka) & set(kb))
+    if not common:
+        return None, None, 0
+    fa, fb = [ka[k] for k in common], [kb[k] for k in common]
+    return (collect(fa, "real", night_subset(fa, cond)), collect(fb, "real", night_subset(fb, cond)), len(common))
 
 
 def build_e1(n_boot):
@@ -258,11 +272,15 @@ def build_e1(n_boot):
             continue
         for key in cells[x]:
             if key in cells[y]:
-                a, b = cells[x][key]["cms"], cells[y][key]["cms"]
+                a, b, nk = balanced_cms(cells[x][key]["src"], cells[y][key]["src"])
+                if a is None:
+                    pairs.append({"pair": f"{x} - {y}", "tag": tag, "protocol": key, "skipped": "no common (fold, seed) runs"})
+                    continue
                 if sorted(a) != sorted(b):
                     pairs.append({"pair": f"{x} - {y}", "tag": tag, "protocol": key, "skipped": "subject sets differ"})
                     continue
-                pairs.append({"pair": f"{x} - {y}", "tag": tag, "protocol": key, **paired_diff(a, b, n_boot=n_boot)})
+                pairs.append({"pair": f"{x} - {y}", "tag": tag, "protocol": key, "n_runs_per_arm": nk,
+                              **paired_diff(a, b, n_boot=n_boot)})
     return tables, pairs
 
 
@@ -316,13 +334,14 @@ def write_e1(tables, pairs, gates, out_md, out_json, seeds=None):
                      + " | ".join(fmt(s[f'f1_{x}']) for x in STAGES) + f" | {orc} | {gap} |")
         L.append("")
     L += ["## Decisive pairs (paired subject bootstrap)", "",
-          "| pair | role | protocol | macro-F1 | F1 N1 | summed non-N1 F1 | n subjects |",
-          "| --- | --- | --- | ---: | ---: | ---: | ---: |"]
+          "Each pair uses only the (fold, seed) runs both arms have (runs per arm column).", "",
+          "| pair | role | protocol | runs per arm | macro-F1 | F1 N1 | summed non-N1 F1 | n subjects |",
+          "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |"]
     for p in pairs:
         if "skipped" in p:
-            L.append(f"| {p['pair']} | {p['tag']} | {p['protocol']} | skipped: {p['skipped']} | | | |")
+            L.append(f"| {p['pair']} | {p['tag']} | {p['protocol']} | | skipped: {p['skipped']} | | | |")
         else:
-            L.append(f"| {p['pair']} | {p['tag']} | {p['protocol']} | {fmt_ci(p['mf1'])} | {fmt_ci(p['f1_N1'])} | "
+            L.append(f"| {p['pair']} | {p['tag']} | {p['protocol']} | {p['n_runs_per_arm']} | {fmt_ci(p['mf1'])} | {fmt_ci(p['f1_N1'])} | "
                      f"{fmt_ci(p['f1_nonN1_sum'])} | {p['n_subjects']} |")
     Path(out_md).write_text("\n".join(L) + "\n")
     Path(out_json).write_text(json.dumps({"gates": gates, "tables": tables, "pairs": pairs}, indent=1))

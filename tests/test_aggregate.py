@@ -159,3 +159,22 @@ def test_e3_band_by_stage_costs(tmp_path, monkeypatch):
     assert set(res) == {"cv", "montage", "sc2st"} and res["cv"]["n_runs"] == 2
     assert res["cv"]["cost"]["real|destroy_sigma"]["mf1"]["diff"] > 0
     assert agg.write_e3("zc", res, tmp_path / "e3.md") == ["real|destroy_sigma"]
+
+
+def test_e1_pairs_use_only_common_runs(tmp_path, monkeypatch):
+    import shutil
+    agg = _agg_script()
+    monkeypatch.chdir(tmp_path)
+    root = Path(__file__).resolve().parents[1]
+    (tmp_path / "splits").mkdir()
+    shutil.copy(root / "splits" / "sleepedf_v1.json", tmp_path / "splits")
+    sp = json.loads((root / "splits" / "sleepedf_v1.json").read_text())
+    rng = np.random.default_rng(4)
+    for arm, seeds in (("cascade2", (0, 1, 2)), ("cascade2_absolute", (0,))):
+        for s in seeds:
+            for f in range(5):
+                r = tmp_path / "runs" / f"e1_{arm}_cv{f}_s{s}"; r.mkdir(parents=True)
+                _write_eval(r / "eval_test_sc2st_Fpz-Cz.json", sp["st"], rng)
+    _, pairs = agg.build_e1(100)
+    p = next(p for p in pairs if p["pair"] == "cascade2 - cascade2_absolute" and p["protocol"] == "sc2st")
+    assert p["n_runs_per_arm"] == 5 and p["n_subjects"] == 22

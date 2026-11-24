@@ -1,35 +1,29 @@
 # MIST-GRM status
 
-**Updated:** 2026-11-23 (Claude Code, owner offline under the delegation in docs/DECISIONS.md)
+**Updated:** 2026-11-24 (Claude Code, owner offline under the overnight delegation of 2026-11-24 01:10)
 
 ## Summary
-- **Done:**
-  - T0 setup; T1 store (G0 passed); T2 splits frozen; T4 real-data invariance; T5 `lf` view; lockbox hardening.
-  - Recipe fix: no early stopping. **Recipe frozen**: `class_weight: sqrt_inv`, chosen on validation only (+0.64 points over null).
-  - **G0b passed** (attnsleep 5-fold pooled test macro-F1 0.7277).
-  - T6b cascade topology implemented and timed (closed). Property tests are on synthetic signals only. Cost per run: cascade 2.44 h vs grm 20 min (7.2x), so the pre-decided seed cuts for non-decisive arms apply (D-014).
-  - T9 stage-targeted critic; T8 code; E0/E1 runners; HMC reader (phase 2, code only).
-  - HMC and DOD-H downloaded and verified.
-  - Sleep-EDF-20 AttnSleep replication (check only, own registry section): the published MF1 78.1 is reproduced, 78.5, under the published repo's test-epoch selection; 75.0 at the final epoch without test selection.
-- **E0 (T6) done, G1 PASSED** (reports/e0.md). Morphology reliance (cost of the corrected `local_phase` surrogate, macro-F1): attnsleep 16.5 in-domain / 4.9 montage / 6.1 sc2st; raw 11.8 / 1.8 / -0.6 (sc2st interval spans 0). A surrogate bug (local_phase halved band power) was found by an audit after the first pass, fixed with a test, and all E0 evaluations rerun (D-011, registry `correction_e0_local_phase`).
-- **Revision 3 (owner, 2026-11-23; DECISIONS D8; blind to E1 results):** GPU only in owner-started 12-hour sessions. Main model is now the own-rate cascade `cascade2` (ARCHITECTURE section 9). T6c is implemented and passes all 88 tests: the 8 owner tests on synthetic signals, and the defaults reproduce the old cascade bit for bit. CPU dry runs of training, evaluation and the session queue all work. The first `cascade2` run in session 1 is the timing run.
-- **Stopped 2026-11-23 23:33:** the D-014 E1 queue. Kept: the five full-rate `cascade` seed-0 runs (validation-gate reference, mean best val MF1 0.7634) and `e1_grm_cv0_s0`. No partial training run existed (D-015).
-- **GPU:** idle, waiting for SESSION START. Then: `nohup scripts/session_queue.sh 1 "<end>" &` (EXPERIMENT_PLAN section 12; priority list experiments/priority.txt, P1 = cascade2 / cascade2_placebo seed 0, interleaved by fold).
-- **CPU, outside sessions:** phase 2 on the data on disk (Part 5 of the owner's message): stores, channel rule, splits, external dev evaluation of the E0 runs.
-- **ISRUC:** 547 of 550 files; group I proceeds without subjects 4, 6 and 39 (retry cancelled; owner fetches them by hand, OPEN_QUESTIONS Q8).
-- **Session break 2026-11-22/23:** the class-weight sweep and the ISRUC retry stopped when the previous session ended. The interrupted run was retrained from scratch (D-008).
-- **Next:**
-  1. Session 1 (on SESSION START): P1, then the validation gate, then G2 and H1 on seed 0 as INTERIM; P2. reports/session_1.md afterwards.
-  2. Meanwhile on CPU: phase 2 stores and splits (HMC, DOD-H, ISRUC, CAP).
+- **GPU session 1 done** (2026-11-24 00:19 to 11:46, deadline 12:04; reports/session_1.md). 33 runs trained, 102 evaluations; no failures, retries or skips. One queue restart at 01:24 with the same end time (D-021). Since 11:46 the GPU is idle until the owner writes SESSION START.
+  - P1 and P2 complete: cascade2 and cascade2_placebo, 5 folds x 3 seeds, each with in-domain, Pz-Oz and sc2st evaluations (std), plus the lf-view evaluations run on CPU afterwards.
+  - P3 started: cascade2_absolute folds 0-2, seed 0. Folds 3 and 4 roll over.
+  - Measured: cascade2 23.5 min per run (10.7 GB peak), cascade2_placebo 16.5 min (7.4 GB), cascade2_absolute 23.3 min.
+- **Validation gate: PASSED** (validation only). cascade2 76.26 vs full-rate cascade 76.34 mean best val macro-F1, seed 0, -0.08 points (one-sided tolerance 1.0).
+- **H1, INTERIM** (seeds 0-2, montage and sc2st only; the age block is not run): cascade2 - cascade2_placebo -1.9 macro-F1 points [-2.4, -1.4] by the corrected primary statistic (EXPERIMENT_PLAN section 7, D-024). In-domain +0.1 [-0.4, +0.6]. The loss is mostly Wake and N1. Changes no plan (owner B6). The confirmatory analysis waits for P5.
+- **G2, INTERIM:** cascade2 - raw in-domain +0.6 [-0.3, +1.5], within 1.5 points.
+- **B8 leakage check** on the large shift gains of the cascade arms over raw: none found (subjects, checkpoint selection, night statistics, lf window). See the notes at the top of reports/session_1.md.
+- **Plan correction D-024 (owner):** the H1 primary statistic is the joint subject bootstrap over the four shift protocols. The mixed model is secondary. No H1 number existed before the change.
+- **CPU now:** external dev evaluation (D2): raw and attnsleep seed 0 on HMC, DOD-H, CAP and ISRUC, then cascade2 and cascade2_placebo seed 0 (INTERIM), into reports/external_dev.md. The missing e1_cascade_cv4_s0 sc2st evaluation runs last.
+- **Next GPU session (2):** cascade2_absolute folds 3-4, then the age-shift block (raw, cascade2, cascade2_placebo, young2old and old2young) through seed 2. About 10.8 h at the measured speed.
 
 ## Gates
 | Gate | Status | Evidence |
 | --- | --- | --- |
 | G0 data | PASSED (VERIFIED) | store manifest: SC 74 people / 146 rec / 397,832 epochs / 396,378 scored; ST 22 / 44 |
-| G0b baseline | **PASSED (VERIFIED)**: 0.7277 >= 0.70, 54 dev people, std, Fpz-Cz, seed 0, frozen recipe. The pre-fix single-fold 0.6999 is kept as history | registry `g0b_attnsleep_5fold_s0`; `t3_attnsleep_cv0_s0` + correction |
-| G1 reliance | **PASSED (VERIFIED, rule D-005)**: every stage, both models, smallest raw N2 +5.8 [+4.2, +7.6]. Effects are upper bounds on reliance (probe-fidelity caveats in reports/e0.md) | registry `g1_decision`, `e0`, `correction_e0_local_phase` |
-| Validation gate (revision 3) | NOT TESTED (session 1) | cascade2 seed 0 within 1.0 point of the full-rate cascade, validation only |
-| G2, G3 | NOT TESTED | |
+| G0b baseline | **PASSED (VERIFIED)**: 0.7277 >= 0.70, 54 dev people, std, Fpz-Cz, seed 0, frozen recipe | registry `g0b_attnsleep_5fold_s0` |
+| G1 reliance | **PASSED (VERIFIED, rule D-005)** | registry `g1_decision`, `e0`, `correction_e0_local_phase` |
+| Validation gate (revision 3) | **PASSED (VERIFIED, validation only, seed 0)**: -0.08 points | runs/gates/val_gate_cascade2_s0.json; registry `session1_gate` |
+| G2 | INTERIM: +0.6 [-0.3, +1.5] in-domain (seeds 0-2); decided on all seeds | reports/e1_interim_s012.md |
+| G3 | NOT TESTED (parallel arms, P9) | |
 
 ## Frozen recipe (validation macro-F1, mean over 5 folds, seed 0)
 | Model | null | sqrt_inv |
@@ -49,6 +43,6 @@
 | DREAMS, SHHS, MASS, MESA, MrOS | not downloaded (licence / applications) |
 
 ## Where to look
-- docs/DECISION_LOG.md: every decision taken while the owner is offline (D-001 to D-016).
-- docs/OPEN_QUESTIONS.md: items reserved for the owner or the supervisor (Q1 to Q7).
+- docs/DECISION_LOG.md: every decision taken while the owner is offline (D-001 to D-024).
+- docs/OPEN_QUESTIONS.md: items reserved for the owner or the supervisor (Q1 to Q11).
 - experiments/registry.yaml: every run and dataset.

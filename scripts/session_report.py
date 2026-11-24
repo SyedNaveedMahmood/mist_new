@@ -92,5 +92,8 @@ for u in nxt:
     L.append(f"- {' + '.join(i['name'] for i in u['items'])} (about {need / 60:.0f} min)")
 L.append(f"\nThese fit one 12-hour session under the 1.3x rule: about {tot / 3600:.1f} h with the margin "
          "(estimates are the largest measured time per arm; unmeasured arms use a conservative prior).")
+notes = Path(f"reports/session_{a.n}_notes.md")      # hand-written checks (e.g. owner rule B8), kept beside the report
+if notes.exists():
+    L[4:4] = [notes.read_text(), ""]
 Path(f"reports/session_{a.n}.md").write_text("\n".join(L) + "\n")
 print(f"reports/session_{a.n}.md")

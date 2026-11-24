@@ -164,6 +164,24 @@ runs:
     note: 'Owner''s revision 3 (DECISIONS D8): own-rate cascade cascade2 and the GPU session plan (EXPERIMENT_PLAN section 12). Blind change: no E1 test score had been read, printed or aggregated. E1 queue
       stopped 2026-11-23 23:33; e1_cascade_cv{0..4}_s0 (full-rate, all trained) kept as the validation-gate reference, mean best val MF1 0.7634. Validation gate, H1 pooling over the protocols run, and the
       priority list fixed before any E1 test score.'
+  - id: session1_gate
+    date: '2026-11-24'
+    commit: 28b4a0a
+    evals: [runs/gates/val_gate_cascade2_s0.json]
+    status: VERIFIED
+    note: 'Revision-3 validation gate, one-sided, validation people only: cascade2 seed 0 mean best val MF1 0.7626 vs full-rate cascade 0.7634 (-0.08 points, tolerance 1.0): PASSED. No test score used.'
+  - id: session1_runs
+    date: '2026-11-24'
+    commit: 28b4a0a
+    evals: ['runs/e1_cascade2_cv{0..4}_s{0,1,2}/eval_test_*.json', 'runs/e1_cascade2_placebo_cv{0..4}_s{0,1,2}/eval_test_*.json', 'runs/e1_cascade2_absolute_cv{0,1,2}_s0/eval_test_*.json']
+    status: VERIFIED
+    note: 'GPU session 1 (reports/session_1.md): 33 runs, frozen recipe; in-domain, Pz-Oz and sc2st evaluations (std) in the session, lf view on CPU after it. No failures or skips. Minutes per run: cascade2 23.5, cascade2_placebo 16.5, cascade2_absolute 23.3.'
+  - id: session1_h1_interim
+    date: '2026-11-24'
+    commit: 28b4a0a
+    evals: [reports/h1_interim_s0.json, reports/h1_interim_s012.json]
+    status: VERIFIED
+    note: 'INTERIM, not confirmatory (owner B6/B7). Primary statistic of EXPERIMENT_PLAN section 7 (D-024), montage and sc2st only. cascade2 - cascade2_placebo pooled macro-F1: seed 0 -1.7 [-2.4, -1.2]; seeds 0-2 -1.9 [-2.4, -1.4]. In-domain beside it: +0.1 [-0.4, +0.6] (seeds 0-2). Within-database shifts; ST development-grade.'
 
 datasets:
   sleep-edfx: {licence: "ODC Attribution 1.0", status: VERIFIED, note: "licence read from PhysioNet page 2026-11-18"}
