@@ -237,3 +237,13 @@ The external dev evaluation of the E0 runs goes ahead on all four datasets after
   - The only cascade2 numbers seen are validation scores (timing run, the gate). Those are allowed.
 - The session queue was not affected and was not restarted.
 - **Reversible:** yes (plan text and code).
+
+### 2026-11-24 - D-025: E1 pairs balanced on common runs; session-1 report fixes (bug fixes, B4)
+- **Found while reading the first draft of reports/session_1.md:** `aggregate.py e1` paired arms whose run sets differed (e.g. 15 cascade2 runs against 3 cascade2_absolute runs on sc2st, where the subject sets match because every fold model tests all ST people). Those rows mixed seeds and folds unevenly.
+- **Fix:** every pair now uses only the (fold, seed) runs both arms have; the table shows runs per arm. Test: tests/test_aggregate.py::test_e1_pairs_use_only_common_runs. The H1 and G2 rows were already balanced (15 vs 15) and did not change; the H1 primary statistic (D-024) pairs this way by construction.
+- **Also fixed:**
+  - The report missed the run that finished across the 01:24 queue restart (e1_cascade2_cv1_s0).
+  - It now prints the gate per fold, and lists only failures, restarts, checks and roll-overs instead of every successful evaluation.
+  - A CPU job chain waited on `pgrep -f 'view lf'`, which matched its own command line, so the external evaluations started about 4 minutes late, by hand.
+- **B8 leakage check** on the cascade arms' large sc2st gains over raw: none found. Details are in reports/session_1_notes.md.
+- **Reversible:** yes.
