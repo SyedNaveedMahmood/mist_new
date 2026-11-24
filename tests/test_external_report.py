@@ -75,3 +75,25 @@ def test_shape_label():
     assert lab(-0.03, -0.001) == "negative" and lab(0.001, 0.05) == "positive"
     assert lab(-0.02, 0.02) == "neutral" and lab(-0.015, 0.004) == "neutral"
     assert lab(-0.025, 0.01) == "inconclusive" and lab(-0.01, 0.021) == "inconclusive"
+
+
+def test_lead_rows_multi_seed(tmp_path, monkeypatch):
+    """Lead rows on seeds 0-1 come first, seed-0 rows beside them; incomplete seed sets are not shown."""
+    er = script()
+    monkeypatch.chdir(tmp_path)
+    rng = np.random.default_rng(2)
+    subs = [f"HMC:{i:03d}" for i in range(6)]
+    for arm, prefix, boost in (("raw", "e0", 0), ("cascade2", "e1", 8), ("cascade2_placebo", "e1", 4)):
+        for s in (0, 1):
+            for f in range(5):
+                r = tmp_path / "runs" / f"{prefix}_{arm}_cv{f}_s{s}"; r.mkdir(parents=True)
+                write_eval(r / "eval_test_ext-hmc-dev_rule.json", "hmc", subs, rng, boost)
+    res = er.build(["raw", "cascade2", "cascade2_placebo"], [0], 200)
+    lead = er.build(["raw", "cascade2", "cascade2_placebo"], [0, 1], 200)
+    assert all(p["n_models"] == 10 for p in lead["hmc"]["pairs"] if p["lead"])
+    er.write(res, [0], tmp_path / "x.md", tmp_path / "x.json", lead, [0, 1])
+    md = (tmp_path / "x.md").read_text().splitlines()
+    rows = [l for l in md if l.startswith("| cascade2_placebo - raw |") and "| 0,1 |" in l or
+            l.startswith("| cascade2_placebo - raw |") and "| 0 |" in l]
+    assert len(rows) == 2 and "| 0,1 | 10 |" in rows[0] and "| 0 | 5 |" in rows[1]
+    assert "lead_multi_seed" in json.loads((tmp_path / "x.json").read_text())
