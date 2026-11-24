@@ -4,6 +4,8 @@ Phase 1 runs entirely on Sleep-EDF Expanded. Phase 2 repeats the decisive compar
 
 ## 1. Questions and hypotheses
 
+*Research questions as first written (history). Since 2026-11-24 the questions are those of section 13 (DECISIONS D9), adopted after the interim H1 result was seen; the hypotheses below are unchanged.*
+
 **RQ1.** Can a model that understands EEG morphology transfer better?
 **RQ2.** Which morphology matters, and does better morphology for N1 raise every stage?
 
@@ -264,3 +266,42 @@ Session numbers say where an item is expected; the queue simply continues down t
 Deferred until the owner says so: the Pz-Oz-trained block, further seeds of the parallel arms, `grm_absolute`, `r`, `m`, `grm_loose`, `grm_nocritic`, `cascade2_bands`, `cascade2_broad`, the other E2 levels.
 
 The five full-rate `cascade` seed-0 runs are kept as the reference for the validation gate and reported descriptively (`cascade2` - `cascade`). The pending evaluations from before the revision (`e1_cascade_cv4_s0` sc2st; `e1_grm_cv0_s0` in-domain, Pz-Oz and sc2st) run in the pending phase.
+
+## 13. Revision 4 (2026-11-24): research questions re-aimed at transfer; session 2 order (DECISIONS D9)
+
+**Made after the interim H1 result of session 1 was seen** (cascade2 - cascade2_placebo -1.9 [-2.4, -1.4] macro-F1 under shift, seeds 0-2, montage and sc2st only; INTERIM). The original questions stay in section 1 as history.
+
+### 13.1 Questions
+- **RQ1.** What in single-channel sleep EEG carries over to new recordings: gain, rhythm or waveform shape?
+- **RQ2.** Does a model restricted to the part that carries over beat standard models on unseen datasets?
+- H1 to H6 stay as pre-specified (section 1, statistics in section 7). H1 (shape improves transfer) is one tested factor, not the paper's premise. **H3 (the factorisation without shape helps transfer) is the central claim to test.**
+- The confirmatory H1 keeps its definition (section 7) and is reported whatever it shows. It needs the complete age block and runs in session 3.
+- Rule 3 is unchanged: no development-target rule exists, so no architecture, band setting or hyperparameter is chosen from any shift, test or external score. No arms beyond `raw_whitened`; no design variants.
+
+### 13.2 What session 1 showed that the gate could not
+On seed 0 the own-rate `cascade2` is below the full-rate `cascade` under shift: Pz-Oz -1.8 [-3.3, -0.6], sc2st -1.1 [-1.5, -0.7] macro-F1 (in-domain -0.4 [-0.8, +0.1]). The revision-3 validation gate compared in-domain validation scores only and could not detect this. "Morphology hurts transfer" is not to be claimed from `cascade2` alone. EXPLORATORY check: full-rate `cascade` - `cascade2_placebo` on the folds both have (reports/session_1.md).
+
+### 13.3 New control arm `raw_whitened` (EXPLORATORY; added after interim results)
+The `raw` model (streams [X], same parameters, same recipe) with its tokens taken from the night-whitened signal (`model.raw_input: whitened`) instead of the scale-only signal. The default (`raw_input: scaled`) leaves `raw` exactly as it was: existing checkpoints load strictly and give identical outputs (tests/test_raw_whitened.py; re-evaluation of e0_raw_cv0_s0 on CPU identical before and after the change). The arm is gain-invariant (tested). It separates how much of the transfer gain of the factorised arms is night whitening alone (`raw_whitened` - `raw`) from what the gain/rhythm split adds on top (`cascade2_placebo` - `raw_whitened`).
+
+### 13.4 Session 2 order (experiments/priority.txt, `scripts/make_priority.py --session 2`)
+| Step | Content |
+| --- | --- |
+| S2-1 | P6, evaluation only: E3 cells (knock G, R, M; destroy M; six band cells) on `cascade2` seeds 0-2; in-domain, Pz-Oz, sc2st (45 evaluations). Full-rate `cascade` seed 0: destroy-M cell only; estimated at about 45 GPU minutes, not clearly under the owner's 45-minute limit, so it runs on CPU |
+| S2-2 | `raw_whitened`, cv, seed 0 (5 runs), three standard evaluations |
+| S2-3 | `cascade2_absolute` folds 3-4, seed 0 |
+| S2-4 | P9: `grm` folds 1-4, `gr` and `grm_placebo` 5 folds, seed 0 |
+| S2-5 | From P7: `cascade2` with `critic_weight` 0, cv, seed 0 |
+| S2-6 | Age block (P5) as far as it fits; per (seed, direction) `raw` first, then the balanced `cascade2` / `cascade2_placebo` pair |
+
+All overnight rules hold (retry once, balanced skips, GPU only inside the session, hard stop 15 minutes before the end). CPU dry run at the measured speeds: S2-1 to S2-5 fit; S2-6 does not start. After the session, on CPU: external dev evaluation of `raw_whitened` seed 0, added to reports/external_dev.md.
+
+### 13.5 Session 2 report, in this order
+a) `raw_whitened` - `raw` and `cascade2_placebo` - `raw_whitened`, per protocol.
+b) Destroy-M cell against real, per protocol, for `cascade2` (does scrambling phase at test time bring it up to `cascade2_placebo` under shift?) and for the full-rate `cascade`.
+c) Band-by-stage table, shift minus in-domain, with Wake and N1 called out.
+d) `grm` - `grm_placebo` and `grm` - `gr`, per protocol (parallel replicate of H1).
+e) `cascade2` with `critic_weight` 0 - `cascade2_placebo`.
+f) `cascade2` - `cascade2_absolute` on all 5 folds.
+Everything labelled INTERIM or EXPLORATORY, with the seeds and folds covered.
+

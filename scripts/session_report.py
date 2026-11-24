@@ -78,6 +78,13 @@ for ss in seed_sets:      # H1 primary statistic (EXPERIMENT_PLAN section 7, D-0
     if r.returncode == 0:
         body = Path(f"{r.stdout.strip().splitlines()[-1]}.md").read_text()
         L += ["", body.replace("\n## ", "\n### ").replace("# H1", "## H1", 1)]
+EXPLORATORY_PAIRS = {1: [("cascade", "cascade2_placebo", "0",
+                          "owner, 2026-11-24: does the full-rate cascade show the deficit cascade2 shows under shift?")]}
+for x, y, ss, why in EXPLORATORY_PAIRS.get(a.n, []):
+    r = subprocess.run([sys.executable, "scripts/aggregate.py", "pair", "--pair", f"{x},{y}", "--seeds", ss],
+                       capture_output=True, text=True, check=True)
+    body = Path(f"{r.stdout.strip().splitlines()[-1]}.md").read_text()
+    L += ["", body.replace("## ", "## EXPLORATORY: ", 1), f"Why: {why} Added after the interim results; no claim rests on it.", ""]
 units, _ = parse_plan(a.plan)
 from session_queue import est_train, load_times  # noqa: E402
 times = load_times()

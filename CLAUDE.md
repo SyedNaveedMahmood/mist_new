@@ -2,7 +2,7 @@
 
 ## What this project is
 
-A methods paper. The model (MIST-GRM) factorises single-channel sleep EEG tokens into gain, rhythm and morphology so that two questions can be answered by switching streams on and off: does morphology help transfer, and which morphology matters (N1 in particular). The owner is Syed Naveed Mahmood. An earlier attempt (repository `Proto-sleep`) produced careful data audits and several negative results; read `docs/LESSONS_FROM_PROTO_SLEEP.md` before proposing anything that resembles it.
+A methods paper about transfer. The model (MIST-GRM) factorises single-channel sleep EEG tokens into gain, rhythm and morphology (waveform shape) so that, by switching streams on and off, two questions can be answered: what carries over to new recordings (gain, rhythm or waveform shape), and does a model restricted to what carries over beat standard models on unseen datasets. This framing (DECISIONS D9, 2026-11-24) was adopted after the interim H1 result was seen; the earlier framing (does morphology help transfer, which morphology matters, N1 in particular) is kept as history in docs/EXPERIMENT_PLAN.md. H1 to H6 are unchanged; H3 is the central claim to test. The owner is Syed Naveed Mahmood. An earlier attempt (repository `Proto-sleep`) produced careful data audits and several negative results; read `docs/LESSONS_FROM_PROTO_SLEEP.md` before proposing anything that resembles it.
 
 Start with `README.md`, then `docs/TASKS.md`. Work the tasks in order.
 

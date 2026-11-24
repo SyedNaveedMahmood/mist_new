@@ -35,6 +35,8 @@ class MistConfig:
     f_hi: float = 35.0
     morph_input: str = "phase_only"               # or "unit_raw"
     night_relative: bool = True                   # False: no whitening, absolute log magnitudes
+    raw_input: str = "scaled"                     # X stream tokens: "scaled" (x / night robust SD, the `raw` arm) or
+                                                  # "whitened" (night-whitened signal; `raw_whitened`, EXPLORATORY, D-026)
     n_slots: int = 32
     slot_temp: float = 0.1
     morph_residual: int = 8                       # capacity cap on non-prototype M features
@@ -228,7 +230,8 @@ class ScaleBranch(nn.Module):
             if self.training and cfg.critic_weight > 0:
                 aux["critic"] = self._critic_loss(f, ph, real, gen, self._critic_mask(y, B, L, N))
         if self.use["X"]:
-            raw = fz.tokens(xraw) * fz.window                 # conventional input: scaled raw waveform tokens
+            src = xw if cfg.raw_input == "whitened" else xraw
+            raw = fz.tokens(src) * fz.window                  # "scaled": conventional input, scaled raw waveform tokens
             parts.append(gate("X", self.raw(raw.reshape(-1, fz.win)).view(B, L, N, -1)))
 
         h = self.proj(torch.cat(parts, -1)).view(B * L, N, -1) + self.pos
@@ -269,6 +272,10 @@ class MistGRM(nn.Module):
     def __init__(self, cfg: MistConfig):
         super().__init__()
         self.cfg = cfg
+        if cfg.raw_input not in ("scaled", "whitened"):
+            raise ValueError(f"unknown raw_input {cfg.raw_input!r}")
+        if cfg.raw_input == "whitened" and (cfg.topology != "parallel" or not cfg.night_relative or "X" not in cfg.streams):
+            raise ValueError("raw_input='whitened' applies to the X stream of the parallel topology with night_relative")
         if cfg.topology == "cascade":
             from .cascade import CascadeBranch as Branch
         elif cfg.topology == "parallel":

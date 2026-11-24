@@ -1,0 +1,4 @@
+# EXPLORATORY control (owner, 2026-11-24; DECISION_LOG D-026), added after interim results.
+# The `raw` model (X stream only, same parameters, same recipe) with its tokens taken from the
+# night-whitened signal instead of the scale-only signal: how much transfer is night whitening alone.
+model: {streams: [X], raw_input: whitened}

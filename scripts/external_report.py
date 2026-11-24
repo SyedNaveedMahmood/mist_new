@@ -25,8 +25,13 @@ from mist.data.external import ISRUC_ROWS
 
 DATASETS = ("hmc", "dodh", "cap", "isruc")
 NAMES = {"hmc": "HMC", "dodh": "DOD-H", "cap": "CAP", "isruc": "ISRUC"}
-INTERIM_ARMS = ("cascade2", "cascade2_placebo")
-PAIRS = [("cascade2", "cascade2_placebo", "H1 direction, INTERIM"), ("attnsleep", "raw", "descriptive")]
+# owner, 2026-11-24: each dataset leads with these two rows (seed 0, INTERIM, development-grade)
+LEAD = [("cascade2_placebo", "raw", "factorisation without shape vs raw (H3 direction), INTERIM"),
+        ("cascade2", "cascade2_placebo", "shape access (H1 direction), INTERIM")]
+PAIRS = LEAD + [("raw_whitened", "raw", "night whitening alone, EXPLORATORY"),
+                ("cascade2_placebo", "raw_whitened", "gain/rhythm split on top of whitening, EXPLORATORY"),
+                ("attnsleep", "raw", "descriptive")]
+INTERIM_ARMS = ("cascade2", "cascade2_placebo", "raw_whitened")
 
 
 def runs_of(arm, seeds):
@@ -38,6 +43,12 @@ def runs_of(arm, seeds):
 
 def eval_file(run, dataset):
     return Path(run, f"eval_test_ext-{dataset}-dev_rule.json")
+
+
+def run_key(f):
+    """(fold, seed) of the Sleep-EDF cv run an external evaluation file belongs to."""
+    name = Path(f).parent.name
+    return int(name.split("_cv")[1].split("_")[0]), int(name.rsplit("_s", 1)[1])
 
 
 def cms_by_row(files, dataset) -> dict:
@@ -78,17 +89,23 @@ def build(arms, seeds, n_boot):
             rows = cms_by_row(files, ds)
             per_arm[arm] = {"n_eval_files": len(files), "n_runs": len(runs), "rows": {
                 k: summary(c) | dict(zip(("mf1_lo", "mf1_hi"), subject_ci(c, n_boot))) for k, c in rows.items()},
-                "_cms": rows}
+                "_files": {run_key(f): f for f in files}}
         pairs = []
         for a, b, tag in PAIRS:
             if a in per_arm and b in per_arm:
-                for k in per_arm[a]["_cms"]:
-                    ca, cb = per_arm[a]["_cms"][k], per_arm[b]["_cms"].get(k)
-                    if cb is None or sorted(ca) != sorted(cb):
+                fa, fb = per_arm[a]["_files"], per_arm[b]["_files"]
+                common = sorted(set(fa) & set(fb))            # only the fold models both arms have
+                if not common:
+                    continue
+                ra = cms_by_row([fa[c] for c in common], ds)
+                rb = cms_by_row([fb[c] for c in common], ds)
+                for k in ra:
+                    if k not in rb or sorted(ra[k]) != sorted(rb[k]):
                         continue
-                    pairs.append({"pair": f"{a} - {b}", "tag": tag, "row": k, **paired_diff(ca, cb, n_boot=n_boot)})
+                    pairs.append({"pair": f"{a} - {b}", "tag": tag, "row": k, "n_models": len(common),
+                                  "lead": (a, b, tag) in LEAD, **paired_diff(ra[k], rb[k], n_boot=n_boot)})
         for v in per_arm.values():
-            v.pop("_cms")
+            v.pop("_files")
         if per_arm:
             res[ds] = {"arms": per_arm, "pairs": pairs}
     return res
@@ -121,8 +138,18 @@ def write(res, seeds, out_md, out_json):
          "files\" (CONDITIONAL). ISRUC group III lies entirely inside ISRUC-A, so any statement about it is "
          "confounded with the recording set-up; no healthy-versus-patient claim is made from ISRUC. "
          f"`{'`, `'.join(INTERIM_ARMS)}` rows are **INTERIM** (phase-1 design not complete).", ""]
+    f = lambda d: f"{100 * d['diff']:+.1f} [{100 * d['lo']:+.1f}, {100 * d['hi']:+.1f}]"
     for ds, r in res.items():
-        L += [f"## {NAMES[ds]}", "", "| arm | row | fold models | people | macro-F1 [95%] | kappa | "
+        L += [f"## {NAMES[ds]}", ""]
+        lead = [p for p in r["pairs"] if p["lead"]]
+        if lead:
+            L += ["**Lead rows** (seed 0, INTERIM, development-grade; paired subject bootstrap on the fold models both "
+                  "arms have):", "", "| pair | role | row | fold models | people | macro-F1 | F1 W | F1 N1 |",
+                  "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |"]
+            L += [f"| {p['pair']} | {p['tag']} | {p['row']} | {p['n_models']} | {p['n_subjects']} | {f(p['mf1'])} | "
+                  f"{f(p['f1_W'])} | {f(p['f1_N1'])} |" for p in lead]
+            L.append("")
+        L += ["| arm | row | fold models | people | macro-F1 [95%] | kappa | "
               + " | ".join(f"F1 {s}" for s in STAGES) + " | note |",
               "| --- | --- | ---: | ---: | ---: | ---: | " + " | ".join("---:" for _ in STAGES) + " | --- |"]
         for arm, v in r["arms"].items():
@@ -132,11 +159,10 @@ def write(res, seeds, out_md, out_json):
                          f"[{fmt(s['mf1_lo'])}, {fmt(s['mf1_hi'])}] | {s['kappa']:.3f} | "
                          + " | ".join(fmt(s[f'f1_{x}']) for x in STAGES) + f" | {note} |")
         if r["pairs"]:
-            L += ["", "| pair | role | row | macro-F1 | F1 N1 | summed non-N1 F1 | people |",
-                  "| --- | --- | --- | ---: | ---: | ---: | ---: |"]
+            L += ["", "All pairs:", "", "| pair | role | row | fold models | macro-F1 | F1 N1 | summed non-N1 F1 | people |",
+                  "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |"]
             for p in r["pairs"]:
-                f = lambda d: f"{100 * d['diff']:+.1f} [{100 * d['lo']:+.1f}, {100 * d['hi']:+.1f}]"
-                L.append(f"| {p['pair']} | {p['tag']} | {p['row']} | {f(p['mf1'])} | {f(p['f1_N1'])} | "
+                L.append(f"| {p['pair']} | {p['tag']} | {p['row']} | {p['n_models']} | {f(p['mf1'])} | {f(p['f1_N1'])} | "
                          f"{f(p['f1_nonN1_sum'])} | {p['n_subjects']} |")
         L.append("")
     Path(out_md).write_text("\n".join(L) + "\n")
@@ -146,7 +172,7 @@ def write(res, seeds, out_md, out_json):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", default="0")
-    ap.add_argument("--arms", default="raw,attnsleep,cascade2,cascade2_placebo")
+    ap.add_argument("--arms", default="raw,attnsleep,cascade2,cascade2_placebo,raw_whitened")
     ap.add_argument("--n-boot", type=int, default=10000)
     ap.add_argument("--out", default="reports/external_dev")
     a = ap.parse_args()

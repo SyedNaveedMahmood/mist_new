@@ -511,9 +511,37 @@ def write_e3(arm, res, out_md):
     Path(out_md).write_text("\n".join(L) + "\n")
     return bands
 
+def build_pair(x, y, protocols=("cv", "montage", "sc2st"), n_boot=10000):
+    """One paired comparison x - y on the (fold, seed) runs both arms have (e.g. EXPLORATORY pairs)."""
+    sp = S.load("splits/sleepedf_v1.json")
+    cx, cy = e1_cells(x, sp), e1_cells(y, sp)
+    out = []
+    for key in protocols:
+        if key in cx and key in cy:
+            a, b, nk = balanced_cms(cx[key]["src"], cy[key]["src"])
+            if a is not None and sorted(a) == sorted(b):
+                out.append({"protocol": key, "label": cx[key]["label"], "n_runs_per_arm": nk,
+                            **paired_diff(a, b, n_boot=n_boot)})
+    return out
+
+
+def write_pair(x, y, rows, label, out_md):
+    L = [f"## {x} - {y} ({label}; seeds {sorted(SEEDS) if SEEDS is not None else 'all'})", "",
+         "Paired subject bootstrap, 10,000 resamples, 95% percentile; only the (fold, seed) runs both arms have. "
+         "Points (x100). Within-database shifts; ST development-grade.", "",
+         "| protocol | runs per arm | people | macro-F1 | " + " | ".join(f"F1 {s}" for s in STAGES) + " |",
+         "| --- | ---: | ---: | ---: | " + " | ".join("---:" for _ in STAGES) + " |"]
+    for r in rows:
+        L.append(f"| {r['label']} | {r['n_runs_per_arm']} | {r['n_subjects']} | {fmt_ci(r['mf1'])} | "
+                 + " | ".join(fmt_ci(r[f'f1_{s}']) for s in STAGES) + " |")
+    Path(out_md).write_text("\n".join(L) + "\n")
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("experiment", choices=["e0", "e1", "h1", "e3"])
+    ap.add_argument("experiment", choices=["e0", "e1", "h1", "e3", "pair"])
+    ap.add_argument("--pair", default=None, help="pair: 'x,y' (x - y)")
+    ap.add_argument("--label", default="EXPLORATORY", help="pair: label printed in the heading")
     ap.add_argument("--confirmatory", action="store_true", help="h1: the single confirmatory run (owner B7)")
     ap.add_argument("--arm", default="cascade2", help="e3: arm; h1: main arm (placebo = <arm>_placebo)")
     ap.add_argument("--n-boot", type=int, default=10000)
@@ -539,6 +567,13 @@ def main():
             Path(f"{stem}.json").write_text(json.dumps(r, indent=1))
         write_h1(r, f"{stem}.md")
         print(stem)
+    elif a.experiment == "pair":
+        x, y = a.pair.split(",")
+        rows = build_pair(x, y, n_boot=a.n_boot)
+        out = a.out if a.out != "reports/e1" else f"reports/pair_{x}_minus_{y}" + (f"_s{a.seeds.replace(',', '')}" if a.seeds else "")
+        write_pair(x, y, rows, a.label, f"{out}.md")
+        Path(f"{out}.json").write_text(json.dumps(rows, indent=1))
+        print(out)
     elif a.experiment == "e3":
         res = build_e3(a.arm, a.n_boot)
         write_e3(a.arm, res, f"reports/e3_{a.arm}.md")

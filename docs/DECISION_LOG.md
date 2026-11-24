@@ -247,3 +247,31 @@ The external dev evaluation of the E0 runs goes ahead on all four datasets after
   - A CPU job chain waited on `pgrep -f 'view lf'`, which matched its own command line, so the external evaluations started about 4 minutes late, by hand.
 - **B8 leakage check** on the cascade arms' large sc2st gains over raw: none found. Details are in reports/session_1_notes.md.
 - **Reversible:** yes.
+
+### 2026-11-24 - D-026: owner's revision 4 (reframing D9, raw_whitened, session 2 order); what the revision-3 gate missed
+- **Reframing (DECISIONS D9, owner's sign-off):** research questions re-aimed at transfer. **This reframing was made after the interim H1 result of session 1 was seen** (cascade2 - cascade2_placebo -1.9 [-2.4, -1.4] under shift, seeds 0-2, montage and sc2st only, INTERIM).
+  - The original questions are kept as history (EXPERIMENT_PLAN section 1, README).
+  - H1 to H6 are unchanged. The confirmatory H1 keeps its definition and is reported whatever it shows.
+  - H3 becomes the central claim to test.
+  - Rule 3 unchanged. Docs: README, CLAUDE.md, EXPERIMENT_PLAN section 13.
+- **Recorded as instructed:** on seed 0 the own-rate cascade2 is below the full-rate cascade under shift: Pz-Oz -1.8 [-3.3, -0.6], sc2st -1.1 [-1.5, -0.7] (reports/e1_interim_s0.md, balanced pairs).
+  - The revision-3 gate compared in-domain validation scores only and could not detect this.
+  - "Morphology hurts transfer" is not to be claimed from cascade2 alone (ARCHITECTURE section 9.5).
+  - **EXPLORATORY** (reports/session_1.md, under the H1 tables): full-rate cascade - cascade2_placebo, seed 0, on the folds both have. Results: in-domain +0.2 [-0.3, +0.9], Pz-Oz -0.1 [-0.8, +0.6], sc2st -0.4 [-1.0, +0.3] (4 folds until the cascade fold-4 sc2st evaluation, running on CPU, lands).
+- **New control arm `raw_whitened` (EXPLORATORY everywhere; added after interim results):**
+  - One switch, `model.raw_input`: `scaled` (default, the `raw` arm) or `whitened` (tokens from the night-whitened signal). It is accepted only for the X stream of the parallel topology with night_relative.
+  - The default leaves `raw` exactly as it was:
+    - The switch adds no parameter, so existing checkpoints load strictly.
+    - e0_raw_cv0_s0 re-evaluated on CPU with the old code and with the new code gave identical night confusion matrices (VERIFIED).
+    - The stored GPU evaluation differs by 1 of 28,989 epochs, which is CPU-vs-GPU arithmetic and not the switch.
+  - Tests (tests/test_raw_whitened.py): default unchanged; the whitened arm differs from raw with the same weights; both arms gain-invariant under recomputed night statistics; invalid combinations refused; same recipe and parameter count (568,423).
+- **Session 2 order (experiments/priority.txt from `scripts/make_priority.py --session 2`; the session-1 list kept as experiments/priority_session1.txt and reproduced identically by `--session 1`):** S2-1 to S2-6 as in EXPERIMENT_PLAN section 13.4. Decisions inside the owner's order:
+  - `--cells e3` now gives exactly the owner's cells: knock G, R, M; destroy M; the five band cells and broad. The three E0 input surrogates are dropped. No E3 file existed, so nothing is lost.
+  - New `--cells destroyM` gives the destroy-M cell only.
+  - **Full-rate cascade destroy-M goes to CPU.** Its earlier GPU evaluations took about 9 min per run for the three protocols (file times of e1_cascade_cv3_s0), so 5 runs come to about 45 min. That is not clearly under the owner's 45-minute limit.
+  - **Age block:** per (seed, direction), raw first, then the balanced pair, so every stopping point leaves balanced comparisons.
+- **Queue estimates fixed** (scripts/session_queue.py; no change to the fit rule):
+  - E3 and destroy-M evaluations are estimated as cells x the 90th percentile of the arm's measured core evaluation, until measured. Before this fix they took the 600 s prior each, 7.5 h for S2-1.
+  - Unmeasured arms' core evaluations are estimated at 3x the slowest measured arm's 90th percentile, instead of 300 s.
+  - CPU dry run of session 2 at measured speeds: S2-1 to S2-5 fit (S2-1 about 1.3 h); S2-6 does not start (raw young2old misses by a few minutes).
+- **Reversible:** yes. The reframing is the owner's.

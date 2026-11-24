@@ -13,7 +13,10 @@
 - **B8 leakage check** on the large shift gains of the cascade arms over raw: none found (subjects, checkpoint selection, night statistics, lf window). See the notes at the top of reports/session_1.md.
 - **Plan correction D-024 (owner):** the H1 primary statistic is the joint subject bootstrap over the four shift protocols. The mixed model is secondary. No H1 number existed before the change.
 - **CPU now:** external dev evaluation (D2): raw and attnsleep seed 0 on HMC, DOD-H, CAP and ISRUC, then cascade2 and cascade2_placebo seed 0 (INTERIM), into reports/external_dev.md. The missing e1_cascade_cv4_s0 sc2st evaluation runs last.
-- **Next GPU session (2):** cascade2_absolute folds 3-4, then the age-shift block (raw, cascade2, cascade2_placebo, young2old and old2young) through seed 2. About 10.8 h at the measured speed.
+- **Revision 4 (owner, 2026-11-24; DECISIONS D9; made after the interim H1 result was seen):** research questions re-aimed at transfer (what carries over: gain, rhythm or shape; does a model restricted to it beat standard models on unseen datasets). H1 to H6 unchanged; H3 is the central claim; the confirmatory H1 runs in session 3 and is reported whatever it shows. EXPERIMENT_PLAN section 13.
+- **Recorded:** on seed 0 the own-rate cascade2 is below the full-rate cascade under shift (Pz-Oz -1.8 [-3.3, -0.6], sc2st -1.1 [-1.5, -0.7]); the in-domain revision-3 gate could not detect this. EXPLORATORY: full-rate cascade - cascade2_placebo is about zero (in-domain +0.2, Pz-Oz -0.1, sc2st -0.4; intervals span 0).
+- **New EXPLORATORY control `raw_whitened`** (raw on night-whitened tokens): code and tests done; trains in session 2.
+- **Next GPU session (2), on SESSION START:** `nohup scripts/session_queue.sh 2 "<end>" &`. Order S2-1 E3 cells on cascade2 (evaluation only), S2-2 raw_whitened, S2-3 cascade2_absolute folds 3-4, S2-4 P9 (grm, gr, grm_placebo), S2-5 cascade2 critic 0, S2-6 age block as far as it fits. Dry run: S2-1 to S2-5 fit; S2-6 rolls to session 3. Full-rate cascade destroy-M runs on CPU.
 
 ## Gates
 | Gate | Status | Evidence |

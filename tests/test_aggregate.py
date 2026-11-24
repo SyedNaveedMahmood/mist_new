@@ -178,3 +178,22 @@ def test_e1_pairs_use_only_common_runs(tmp_path, monkeypatch):
     _, pairs = agg.build_e1(100)
     p = next(p for p in pairs if p["pair"] == "cascade2 - cascade2_absolute" and p["protocol"] == "sc2st")
     assert p["n_runs_per_arm"] == 5 and p["n_subjects"] == 22
+
+
+def test_exploratory_pair_balanced(tmp_path, monkeypatch):
+    agg = _agg_script()
+    monkeypatch.chdir(tmp_path)
+    rng = np.random.default_rng(5)
+    _h1_tree(tmp_path, agg, (0, 1), rng)
+    import shutil
+    for d in (tmp_path / "runs").glob("e1_zc_placebo_*"):          # placebo first: "e1_zc_*" also matches it
+        d.rename(d.with_name(d.name.replace("e1_zc_placebo_", "e1_cascade2_placebo_")))
+    for d in (tmp_path / "runs").glob("e1_zc_*"):                 # zc -> cascade, seed 0 only
+        if d.name.endswith("_s1"):
+            shutil.rmtree(d)
+        else:
+            d.rename(d.with_name(d.name.replace("e1_zc_", "e1_cascade_")))
+    shutil.rmtree(tmp_path / "runs" / "e1_cascade_cv4_s0")
+    rows = agg.build_pair("cascade", "cascade2_placebo", n_boot=100)
+    assert [r["protocol"] for r in rows] == ["cv", "montage", "sc2st"]
+    assert all(r["n_runs_per_arm"] == 4 for r in rows) and rows[2]["n_subjects"] == 22

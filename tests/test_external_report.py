@@ -43,7 +43,10 @@ def test_external_report(tmp_path, monkeypatch):
     assert res["isruc"]["arms"]["raw"]["n_eval_files"] == 5 and res["hmc"]["arms"]["cascade2"]["n_runs"] == 5
     p = [x for x in res["isruc"]["pairs"] if x["pair"] == "cascade2 - cascade2_placebo"]
     assert [x["row"] for x in p] == ["ISRUC-M", "ISRUC-A", "all"] and all(x["mf1"]["lo"] > 0 for x in p)
+    assert all(x["lead"] and x["n_models"] == 5 for x in p)
+    lead = [x["pair"] for x in res["hmc"]["pairs"] if x["lead"]]
+    assert lead == ["cascade2_placebo - raw", "cascade2 - cascade2_placebo"]
     er.write(res, [0], tmp_path / "x.md", tmp_path / "x.json")
     md = (tmp_path / "x.md").read_text()
-    assert "INTERIM" in md and "comparison with pooled papers only" in md and "holdouts stay closed" in md
+    assert md.index("Lead rows") < md.index("| arm | row |") and "INTERIM" in md and "comparison with pooled papers only" in md and "holdouts stay closed" in md
     assert er.role("cascade2_absolute", "isruc", "ISRUC-A").startswith("descriptive")

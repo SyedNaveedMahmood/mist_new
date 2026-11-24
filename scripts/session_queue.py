@@ -44,6 +44,7 @@ PRIOR = {  # seconds, conservative until measured in a session (train, one evalu
     "cascade": (8782, 900),
     "grm": (1218, 300), "gr": (1218, 300), "raw": (1575, 300), "attnsleep": (300, 120),
 }
+CELL_FACTOR = {"e3": 12, "destroyM": 2}      # cells per evaluation (+1 for loading), until measured
 CV_EVALS = [([], "eval_test_cv_{ch}.json"), (["--channel", "Pz-Oz"], "eval_test_cv_Pz-Oz.json"),
             (["--protocol", "sc2st"], "eval_test_sc2st_{ch}.json")]
 
@@ -102,7 +103,8 @@ def eval_item(run, args, out=None, arm=None):
             import yaml
             c = yaml.safe_load(run_cfg.read_text())
             ch0, p0 = c["data"]["channel"], c["split"]["protocol"]
-        tag = get("--tag", "e3" if get("--cells", "all") == "e3" else "test")
+        cells = get("--cells", "all")
+        tag = get("--tag", cells if cells in ("e3", "destroyM") else "test")
         view = get("--view", "std")
         out = f"eval_{tag}_{get('--protocol', p0)}_{get('--channel', ch0)}" + ("" if view == "std" else f"_{view}") + ".json"
     return {"run": run, "args": args, "out": out, "arm": arm}
@@ -130,8 +132,18 @@ def est_train(item, times):
 def est_eval(e, times):
     arm = e.get("arm") or run_arm(e["run"])
     got = times.get("eval", {}).get(arm_key(arm))
-    if "--cells" in e["args"] and e["args"][e["args"].index("--cells") + 1] == "core":
-        got = times.get("eval_core", {}).get(arm_key(arm)) or got
+    cells = e["args"][e["args"].index("--cells") + 1] if "--cells" in e["args"] else "all"
+    core = times.get("eval_core", {}).get(arm_key(arm))
+    if cells == "core":
+        allc = times.get("eval_core", {}).values()
+        if not core and allc:          # unmeasured arm: 3x the slowest measured arm's 90th percentile
+            core = [3 * max(sorted(v)[int(0.9 * (len(v) - 1))] for v in allc)]
+        got = core or got
+    elif cells in CELL_FACTOR and core and not times.get(f"eval_{cells}", {}).get(arm_key(arm)):
+        p90 = sorted(core)[int(0.9 * (len(core) - 1))]    # robust to a cold-cache outlier; every cell = one core pass
+        got = [CELL_FACTOR[cells] * p90]
+    elif cells in CELL_FACTOR:
+        got = times.get(f"eval_{cells}", {}).get(arm_key(arm)) or got
     return max(got) if got else PRIOR.get(arm_key(arm), (0, 900))[1]
 
 
@@ -271,8 +283,9 @@ def do_eval(e, clock, times, quiet_log, retry=True):
     if rc == 0:
         mark(Path(e["run"]) / e["out"])
     if rc == 0 and not clock.dry:
-        core = "--cells" in e["args"] and e["args"][e["args"].index("--cells") + 1] == "core"
-        record("eval_core" if core else "eval", arm_key(e.get("arm") or run_arm(e["run"])), sec)
+        cells = e["args"][e["args"].index("--cells") + 1] if "--cells" in e["args"] else "all"
+        key = "eval_core" if cells == "core" else f"eval_{cells}" if cells in CELL_FACTOR else "eval"
+        record(key, arm_key(e.get("arm") or run_arm(e["run"])), sec)
     log(f"eval {e['run']} -> {e['out']}: {'ok' if rc == 0 else 'FAILED' if rc else 'KILLED at deadline'} "
         f"({sec / 60:.1f} min)", clock)
     if rc is None:

@@ -1,11 +1,15 @@
 # mist_new: MIST-GRM
 
-Single-channel sleep staging with waveform tokens split, exactly, into **gain**, **rhythm** and **morphology**, built to answer two questions:
+Single-channel sleep staging with waveform tokens split, exactly, into **gain**, **rhythm** and **morphology** (waveform shape), built to answer two questions (re-aimed at transfer on 2026-11-24, DECISIONS D9, **after** the interim H1 result of GPU session 1 was seen):
 
-1. Can a model that understands EEG morphology transfer better?
-2. Which morphology matters, and does better morphology for N1 raise every stage?
+1. What in single-channel sleep EEG carries over to new recordings: gain, rhythm or waveform shape?
+2. Does a model restricted to the part that carries over beat standard models on unseen datasets?
 
-Phase 1 runs on Sleep-EDF Expanded only. Nothing has been trained on real EEG yet.
+The pre-specified hypotheses H1 to H6 are unchanged (docs/EXPERIMENT_PLAN.md). H1 (shape improves transfer) is one tested factor; H3 (the factorisation without shape helps transfer) is the central claim to test.
+
+The original questions, kept as history: (1) Can a model that understands EEG morphology transfer better? (2) Which morphology matters, and does better morphology for N1 raise every stage?
+
+Phase 1 runs on Sleep-EDF Expanded only (within-database shifts). Current state: reports/STATUS.md.
 
 ## Where things stand (2026-11-22)
 

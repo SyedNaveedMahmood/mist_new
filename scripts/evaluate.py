@@ -40,14 +40,15 @@ def main():
     ap.add_argument("--paths", default="configs/paths.yaml")
     ap.add_argument("--tag", default="test")
     ap.add_argument("--view", default=None, help="evaluation window; default = training view (std). lf = label-free")
-    ap.add_argument("--cells", default="all", choices=("all", "core", "e3"))
+    ap.add_argument("--cells", default="all", choices=("all", "core", "e3", "destroyM"),
+                    help="core = real only; e3 = knock G/R/M, destroy M, band cells (P6, owner 2026-11-24); destroyM = that cell only")
     ap.add_argument("--dataset", default=None, choices=sorted(DATASETS), help="external dataset (phase 2)")
     ap.add_argument("--part", default="dev", choices=("dev", "train", "val"),
                     help="external split part; the test part is a holdout and is not available here")
     ap.add_argument("--split-file", default=None, help="external split file; default: the version in use (isruc v2, others v1)")
     a = ap.parse_args()
-    if a.cells == "e3" and a.tag == "test":
-        a.tag = "e3"
+    if a.cells in ("e3", "destroyM") and a.tag == "test":
+        a.tag = a.cells
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model, cfg = load_checkpoint(a.run, device)
     if a.dataset:
@@ -80,8 +81,12 @@ def main():
         cells += [("real", (), None, (b,)) for b in BAND_NAMES + (("broad",) if has_broad else ())]
     if a.cells == "core":
         cells = cells[:1]
-    elif a.cells == "e3":
-        cells = cells[1:]
+    elif a.cells == "e3":                     # the input surrogates (E0) are not part of E3
+        cells = [c for c in cells[1:] if c[0] == "real"]
+    elif a.cells == "destroyM":
+        cells = [c for c in cells if c == ("real", (), 1.0, ())]
+        if not cells:
+            raise SystemExit("--cells destroyM needs a model with the M stream")
     out = {"protocol": protocol, "channel": channel, "n_nights": len(nights), "view": cfg["data"].get("view", "std"),
            "cells_set": a.cells, "night_meta": {n.record_id: {"subject": n.subject, "condition": n.meta.get("condition"),
                                          **({"channel": n.meta["rule_channel"] if channel == "rule" else channel}
