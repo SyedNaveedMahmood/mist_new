@@ -30,28 +30,34 @@ head = next((l for l in log if "deadline" in l), "")
 L += ["## Session", "", f"- Queue start: `{head}`", f"- Queue end: `{log[-1] if log else ''}`", ""]
 L += ["## Runs done", "", "| run | train min | best val MF1 (validation) | best epoch | GPU peak MB |",
       "| --- | ---: | ---: | ---: | ---: |"]
+trained = []                       # (run, minutes) in log order; a run finished across a queue restart counts too
 for l in log:
-    m = re.search(r"train (\S+): ok \(([\d.]+) min\)", l)
-    if m:
-        s = json.loads(Path(f"runs/{m.group(1)}/train_summary.json").read_text())
-        L.append(f"| {m.group(1)} | {float(m.group(2)):.1f} | {s['best_val_mf1']:.4f} | {s['best_epoch']} | {s.get('gpu_peak_mb')} |")
-L += ["", "Evaluations, interruptions and roll-overs:", ""]
-L += [f"- `{l}`" for l in log if re.search(r"eval .*-> |KILLED|FAILED|does not fit|moved|retrying|check ", l)]
+    m = re.search(r"train (\S+): ok \(([\d.]+) min\)", l) or re.search(r"waiting for the running training (\S+) to end", l)
+    if m and Path(f"runs/{m.group(1)}/train_summary.json").exists() and m.group(1) not in dict(trained):
+        s_ = json.loads(Path(f"runs/{m.group(1)}/train_summary.json").read_text())
+        trained.append((m.group(1), float(m.group(2)) if m.lastindex == 2 else s_["wall_sec"] / 60))
+for run, mins in trained:
+    s = json.loads(Path(f"runs/{run}/train_summary.json").read_text())
+    L.append(f"| {run} | {mins:.1f} | {s['best_val_mf1']:.4f} | {s['best_epoch']} | {s.get('gpu_peak_mb')} |")
+n_ok = sum(1 for l in log if re.search(r"eval .*-> .*: ok", l))
+L += ["", f"{len(trained)} runs trained; {n_ok} evaluations ok. Failures, retries, skips, restarts, checks and roll-overs:", ""]
+L += [f"- `{l}`" for l in log if re.search(r"KILLED|FAILED|failed|does not fit|no time|moved|retry|skip|restart|check |GPU", l)]
 gates = sorted(Path("runs/gates").glob("val_gate_*.json")) if Path("runs/gates").exists() else []
 if gates:
     L += ["", "## Validation gate (validation people only)", ""]
     for g in gates:
         d = json.loads(g.read_text())
         L.append(f"- {d['arm']} vs {d['ref']}, seed {d['seed']}: mean best val MF1 {100 * d['mean_arm']:.2f} vs "
-                 f"{100 * d['mean_ref']:.2f} ({d['diff_points']:+.2f} points, tolerance {d['tol_points']:.1f}): **{d['status']}**")
+                 f"{100 * d['mean_ref']:.2f} ({d['diff_points']:+.2f} points, tolerance {d['tol_points']:.1f}, {d['rule']}): **{d['status']}**")
+        L += ["", "| fold | " + " | ".join(d["per_fold"]) + " |", "| ---: | " + " | ".join("---:" for _ in d["per_fold"]) + " |"]
+        L += [f"| {f} | " + " | ".join(f"{100 * v[f]:.2f}" for v in d["per_fold"].values()) + " |" for f in range(5)]
 # minutes per run per arm and peak memory, from train_summary.json of the runs trained in this session
 import statistics
 per_arm = {}
-for l in log:
-    m = re.search(r"train (\S+): ok", l)
-    if m:
-        s_ = json.loads(Path(f"runs/{m.group(1)}/train_summary.json").read_text())
-        arm = json.loads(json.dumps(__import__("yaml").safe_load(Path(f"runs/{m.group(1)}/config.yaml").read_text())))["arm"]
+for run, _ in trained:
+    if True:
+        s_ = json.loads(Path(f"runs/{run}/train_summary.json").read_text())
+        arm = json.loads(json.dumps(__import__("yaml").safe_load(Path(f"runs/{run}/config.yaml").read_text())))["arm"]
         per_arm.setdefault(arm, []).append((s_["wall_sec"] / 60, s_.get("gpu_peak_mb")))
 L += ["", "## Minutes per run per arm (training wall time from train_summary.json)", "",
       "| arm | runs | median min | max min | peak GPU MB |", "| --- | ---: | ---: | ---: | ---: |"]

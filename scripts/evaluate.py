@@ -27,7 +27,7 @@ import torch
 
 from mist.config import load_paths
 from mist.data import splits as S
-from mist.data.external import DATASETS, load_external
+from mist.data.external import DATASETS, isruc_subdomain, load_external
 from mist.data.store import load_cohort
 from mist.engine.loop import evaluate, load_checkpoint, make_dataset
 
@@ -85,7 +85,9 @@ def main():
     out = {"protocol": protocol, "channel": channel, "n_nights": len(nights), "view": cfg["data"].get("view", "std"),
            "cells_set": a.cells, "night_meta": {n.record_id: {"subject": n.subject, "condition": n.meta.get("condition"),
                                          **({"channel": n.meta["rule_channel"] if channel == "rule" else channel}
-                                            if a.dataset else {})} for n in nights},
+                                            if a.dataset else {}),
+                                         **({"subdomain": isruc_subdomain(n.meta)} if a.dataset == "isruc" else {})}
+                                         for n in nights},
            "cells": {}}
     for cond, knock, destroy, bands in cells:
         key = (cond + ("" if not knock else f"|knock_{''.join(knock)}") + ("" if destroy is None else "|destroy_M")
