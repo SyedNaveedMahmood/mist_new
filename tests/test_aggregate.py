@@ -197,3 +197,33 @@ def test_exploratory_pair_balanced(tmp_path, monkeypatch):
     rows = agg.build_pair("cascade", "cascade2_placebo", n_boot=100)
     assert [r["protocol"] for r in rows] == ["cv", "montage", "sc2st"]
     assert all(r["n_runs_per_arm"] == 4 for r in rows) and rows[2]["n_subjects"] == 22
+
+
+def test_session2_report_sections(tmp_path, monkeypatch):
+    import shutil
+    from mist.models.cascade import BAND_NAMES
+    agg = _agg_script()
+    monkeypatch.chdir(tmp_path)
+    root = Path(__file__).resolve().parents[1]
+    (tmp_path / "splits").mkdir()
+    shutil.copy(root / "splits" / "sleepedf_v1.json", tmp_path / "splits")
+    sp = json.loads((root / "splits" / "sleepedf_v1.json").read_text())
+    rng = np.random.default_rng(6)
+    e3_cells = ("real|destroy_M",) + tuple(f"real|destroy_{b}" for b in BAND_NAMES + ("broad",))
+    for arm, prefix in (("cascade2", "e1"), ("cascade2_placebo", "e1"), ("cascade2_cw0", "e2")):
+        for f in range(5):
+            r = tmp_path / "runs" / f"{prefix}_{arm}_cv{f}_s0"; r.mkdir(parents=True)
+            for tag_file, subs in (("cv_Fpz-Cz", sp["folds"][f]), ("cv_Pz-Oz", sp["folds"][f]), ("sc2st_Fpz-Cz", sp["st"])):
+                _write_eval(r / f"eval_test_{tag_file}.json", subs, rng, boost=5)
+                if arm == "cascade2":
+                    _write_eval(r / f"eval_e3_{tag_file}.json", subs, rng, cells=e3_cells)
+    sec = agg.build_s2(100)
+    b = sec["b"]["cascade2 destroy-M - cascade2 real"]
+    assert [r["protocol"] for r in b] == ["cv", "montage", "sc2st"] and b[0]["n_runs_per_arm"] == 5
+    assert sec["b"]["cascade destroy-M - cascade real (full-rate)"] == [None, None, None]
+    assert sec["e"]["cascade2 critic_weight 0 - cascade2_placebo"][2]["n_subjects"] == 22
+    c = sec["c"]
+    assert c["n_runs"] == 5 and len(c["rows"]) == 2 * (len(BAND_NAMES) + 1)
+    agg.write_s2(sec, tmp_path / "s2.md")
+    md = (tmp_path / "s2.md").read_text()
+    assert md.index("## a)") < md.index("## b)") < md.index("## c)") < md.index("## f)") and "not available yet" in md

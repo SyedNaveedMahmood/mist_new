@@ -99,3 +99,15 @@ def test_joint_resample_moves_a_person_together_and_checks_inputs():
         joint_shift_bootstrap(a, a, [SC[:5]], n_boot=10)                           # subject outside every stratum
     with pytest.raises(ValueError):
         joint_shift_bootstrap(a, a, [SC[:10], SC[5:12]], n_boot=10)                # overlapping strata
+
+
+def test_joint_contrast_matches_paired_difference_and_cancels():
+    from mist.aggregate import joint_contrast, paired_diff
+    rng = np.random.default_rng(7)
+    a, b = simulate(rng)
+    one = joint_contrast({"x": a["sc2st"], "y": b["sc2st"]}, [(1, "x"), (-1, "y")], [SC, ST], n_boot=2000)
+    ref = paired_diff(a["sc2st"], b["sc2st"], n_boot=2000)
+    assert one["mf1"]["diff"] == pytest.approx(ref["mf1"]["diff"])
+    assert abs(one["mf1"]["lo"] - ref["mf1"]["lo"]) < 0.01 and abs(one["mf1"]["hi"] - ref["mf1"]["hi"]) < 0.01
+    zero = joint_contrast({"x": a["montage"]}, [(1, "x"), (-1, "x")], [SC, ST], n_boot=200)
+    assert zero["mf1"] == pytest.approx({"diff": 0, "lo": 0, "hi": 0})

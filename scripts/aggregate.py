@@ -16,7 +16,7 @@ import json
 from pathlib import Path
 
 from mist import STAGES
-from mist.aggregate import collect, joint_shift_bootstrap, paired_diff, restrict, summary
+from mist.aggregate import collect, joint_contrast, joint_shift_bootstrap, paired_diff, restrict, summary
 from mist.data import splits as S
 from mist.metrics import normalized_gap
 
@@ -189,6 +189,9 @@ def e1_runs(arm, block):
 
 
 def _e1_runs(arm, block):
+    if ":" in arm:                                       # "e2:cascade2_cw0" -> runs/e2_cascade2_cw0_cv<f>_s<s>
+        prefix, name = arm.split(":", 1)
+        return sorted(glob.glob(f"runs/{prefix}_{name}_cv[0-4]_s[0-9]")) if block == "cv" else []
     if block == "cv":
         runs = glob.glob(f"runs/e1_{arm}_cv[0-4]_s[0-9]")
         if arm in ("raw", "attnsleep"):
@@ -537,9 +540,118 @@ def write_pair(x, y, rows, label, out_md):
     Path(out_md).write_text("\n".join(L) + "\n")
 
 
+# ----------------------------------------------------------------------------- session 2 report (EXPERIMENT_PLAN 13.5)
+PROTO_FILES = {"cv": "cv_Fpz-Cz", "montage": "cv_Pz-Oz", "sc2st": "sc2st_Fpz-Cz"}
+PROTO_LABEL = {"cv": "in-domain", "montage": "Fpz-Cz to Pz-Oz", "sc2st": "sc2st"}
+
+
+def cell_files(arm, tag, proto):
+    fn = f"eval_{tag}_{PROTO_FILES[proto]}.json"
+    return {_run_key(r): f"{r}/{fn}" for r in e1_runs(arm, "cv") if Path(r, fn).exists()}
+
+
+def cell_pair(a, b, proto, n_boot):
+    """a, b = (arm, tag, cell): a - b on the (fold, seed) runs both have, paired subject bootstrap."""
+    fa, fb = cell_files(a[0], a[1], proto), cell_files(b[0], b[1], proto)
+    common = sorted(set(fa) & set(fb))
+    if not common:
+        return None
+    ca, cb = collect([fa[k] for k in common], a[2]), collect([fb[k] for k in common], b[2])
+    if sorted(ca) != sorted(cb):
+        return None
+    folds, seeds = sorted({k[0] for k in common}), sorted({k[1] for k in common})
+    return {"protocol": proto, "n_runs_per_arm": len(common), "folds": folds, "seeds": seeds,
+            **paired_diff(ca, cb, n_boot=n_boot)}
+
+
+def band_shift_minus_indomain(arm, n_boot):
+    """Cost of destroying each band's phase (real - cell), shift minus in-domain, joint bootstrap over people."""
+    from mist.models.cascade import BAND_NAMES
+    sp = S.load("splits/sleepedf_v1.json")
+    files = {p: (cell_files(arm, "test", p), cell_files(arm, "e3", p)) for p in PROTO_FILES}
+    keys = sorted(set.intersection(*[set(t) & set(e) for t, e in files.values()]))
+    if not keys:
+        return None
+    out = {"n_runs": len(keys), "seeds": sorted({k[1] for k in keys}), "rows": {}}
+    for band in BAND_NAMES + ("broad",):
+        cell = f"real|destroy_{band}"
+        try:
+            cms = {f"{p}|{c}": collect([(files[p][0] if c == "real" else files[p][1])[k] for k in keys], c)
+                   for p in PROTO_FILES for c in ("real", cell)}
+        except KeyError:
+            continue
+        for shift in ("montage", "sc2st"):
+            out["rows"][(band, shift)] = joint_contrast(
+                cms, [(1, f"{shift}|real"), (-1, f"{shift}|{cell}"), (-1, "cv|real"), (1, f"cv|{cell}")],
+                [list(sp["dev"]), list(sp["st"])], n_boot=n_boot)
+    return out
+
+
+def build_s2(n_boot):
+    pr = list(PROTO_FILES)
+    T = lambda arm, cell="real", tag="test": (arm, tag, cell)
+    sec = {}
+    sec["a"] = {f"{x} - {y}": [cell_pair(T(x), T(y), p, n_boot) for p in pr]
+                for x, y in (("raw_whitened", "raw"), ("cascade2_placebo", "raw_whitened"))}
+    sec["b"] = {"cascade2 destroy-M - cascade2 real": [cell_pair(T("cascade2", "real|destroy_M", "e3"), T("cascade2"), p, n_boot) for p in pr],
+                "cascade2 destroy-M - cascade2_placebo real": [cell_pair(T("cascade2", "real|destroy_M", "e3"), T("cascade2_placebo"), p, n_boot) for p in pr],
+                "cascade destroy-M - cascade real (full-rate)": [cell_pair(T("cascade", "real|destroy_M", "destroyM"), T("cascade"), p, n_boot) for p in pr]}
+    sec["c"] = band_shift_minus_indomain("cascade2", n_boot)
+    sec["d"] = {f"{x} - {y}": [cell_pair(T(x), T(y), p, n_boot) for p in pr] for x, y in (("grm", "grm_placebo"), ("grm", "gr"))}
+    sec["e"] = {"cascade2 critic_weight 0 - cascade2_placebo": [cell_pair(T("e2:cascade2_cw0"), T("cascade2_placebo"), p, n_boot) for p in pr]}
+    sec["f"] = {"cascade2 - cascade2_absolute": [cell_pair(T("cascade2"), T("cascade2_absolute"), p, n_boot) for p in pr]}
+    return sec
+
+
+S2_TITLES = {
+    "a": ("How much of the transfer gain is night whitening alone, and how much the gain/rhythm split adds", "EXPLORATORY"),
+    "b": ("Does scrambling phase at test time bring cascade2 up to cascade2_placebo under shift? (destroy-M cell)", "EXPLORATORY"),
+    "c": ("Band x stage: cost of destroying each band's phase (real - cell), shift minus in-domain, cascade2", "INTERIM"),
+    "d": ("Parallel replicate of H1: grm - grm_placebo and grm - gr", "INTERIM"),
+    "e": ("cascade2 with critic_weight 0 - cascade2_placebo", "INTERIM"),
+    "f": ("cascade2 - cascade2_absolute (H3)", "INTERIM")}
+
+
+def write_s2(sec, out_md):
+    L = ["# Session 2 results (EXPERIMENT_PLAN section 13.5)", "",
+         "Points (x100). Paired subject bootstrap, 10,000 resamples, 95% percentile, on the (fold, seed) runs both "
+         "sides have; the table says which. Within-database shifts (Sleep-EDF); ST development-grade. "
+         "`raw_whitened` and every comparison added on 2026-11-24 are EXPLORATORY (added after interim results).", ""]
+    stages = ", ".join(f"F1 {s}" for s in STAGES)
+    for k in "abcdef":
+        title, lab = S2_TITLES[k]
+        if k == "c":
+            c = sec["c"]
+            L += [f"## c) {title} ({lab})", ""]
+            if not c:
+                L += ["Not available yet (needs the E3 files).", ""]
+            else:
+                L += [f"{c['n_runs']} runs, seeds {c['seeds']}. Positive = destroying that band costs more under shift than "
+                      "in-domain. Joint bootstrap over people (SC development and ST strata). **Wake and N1 called out.**", "",
+                      "| band | shift | macro-F1 | **F1 W** | **F1 N1** | F1 N2 | F1 N3 | F1 REM |",
+                      "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |"]
+                for (band, shift), d in c["rows"].items():
+                    L.append(f"| {band} | {PROTO_LABEL[shift]} | {fmt_ci(d['mf1'])} | **{fmt_ci(d['f1_W'])}** | "
+                             f"**{fmt_ci(d['f1_N1'])}** | {fmt_ci(d['f1_N2'])} | {fmt_ci(d['f1_N3'])} | {fmt_ci(d['f1_REM'])} |")
+                L.append("")
+            continue
+        L += [f"## {k}) {title} ({lab})", "", f"| comparison | protocol | runs per side | folds | seeds | macro-F1 | {' | '.join(f'F1 {s}' for s in STAGES)} |",
+              "| --- | --- | ---: | --- | --- | ---: | " + " | ".join("---:" for _ in STAGES) + " |"]
+        for name, rows in sec[k].items():
+            for r in rows:
+                if r is None:
+                    continue
+                L.append(f"| {name} | {PROTO_LABEL[r['protocol']]} | {r['n_runs_per_arm']} | {r['folds']} | {r['seeds']} | "
+                         f"{fmt_ci(r['mf1'])} | " + " | ".join(fmt_ci(r[f'f1_{s}']) for s in STAGES) + " |")
+            if all(r is None for r in rows):
+                L.append(f"| {name} | not available yet | | | | | " + " | ".join("" for _ in STAGES) + " |")
+        L.append("")
+    Path(out_md).write_text("\n".join(L) + "\n")
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("experiment", choices=["e0", "e1", "h1", "e3", "pair"])
+    ap.add_argument("experiment", choices=["e0", "e1", "h1", "e3", "pair", "s2"])
     ap.add_argument("--pair", default=None, help="pair: 'x,y' (x - y)")
     ap.add_argument("--label", default="EXPLORATORY", help="pair: label printed in the heading")
     ap.add_argument("--confirmatory", action="store_true", help="h1: the single confirmatory run (owner B7)")
@@ -567,6 +679,15 @@ def main():
             Path(f"{stem}.json").write_text(json.dumps(r, indent=1))
         write_h1(r, f"{stem}.md")
         print(stem)
+    elif a.experiment == "s2":
+        sec = build_s2(a.n_boot)
+        out = a.out if a.out != "reports/e1" else "reports/session2_results"
+        write_s2(sec, f"{out}.md")
+        c = sec["c"]
+        if c:
+            c["rows"] = {f"{b}|{sh}": v for (b, sh), v in c["rows"].items()}
+        Path(f"{out}.json").write_text(json.dumps(sec, indent=1))
+        print(out)
     elif a.experiment == "pair":
         x, y = a.pair.split(",")
         rows = build_pair(x, y, n_boot=a.n_boot)

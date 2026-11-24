@@ -64,6 +64,10 @@ L += ["", "## Minutes per run per arm (training wall time from train_summary.jso
 for arm, v in per_arm.items():
     L.append(f"| {arm} | {len(v)} | {statistics.median(x for x, _ in v):.1f} | {max(x for x, _ in v):.1f} | "
              f"{max((p for _, p in v if p), default='')} |")
+if a.n == 2:            # owner's order for the session-2 report, a) to f) first (EXPERIMENT_PLAN section 13.5)
+    r = subprocess.run([sys.executable, "scripts/aggregate.py", "s2"], capture_output=True, text=True, check=True)
+    body = Path(f"{r.stdout.strip().splitlines()[-1]}.md").read_text().split("\n", 1)[1]
+    L += ["", "## Session 2 questions, in the owner's order", "", body.replace("\n## ", "\n### ")]
 seed_sets = a.seeds.split(";") if a.seeds else [None]
 for ss in seed_sets:
     out = f"reports/e1_interim_s{ss.replace(',', '')}" if ss else "reports/e1"

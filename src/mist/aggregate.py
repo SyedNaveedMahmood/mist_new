@@ -127,3 +127,35 @@ def joint_shift_bootstrap(cms_a: dict, cms_b: dict, strata, n_boot: int = 10000,
     p_boot = float(min(1.0, 2 * min((pooled_boot <= 0).mean(), (pooled_boot >= 0).mean())))
     return {"per_protocol": per, "pooled": {"diff": point, "lo": float(lo), "hi": float(hi), "p_boot": p_boot,
             "n_boot_used": int(pooled_boot.size)}, "protocols": protos, "strata_sizes": [len(s) for s in strata]}
+
+
+def joint_contrast(cms: dict, contrast, strata, n_boot: int = 10000, seed: int = 0, metrics=METRICS) -> dict:
+    """Linear contrast of pooled scores over several (protocol, cell) subject tables, with one joint bootstrap.
+
+    cms: {key: {subject: cm}}; contrast: [(weight, key), ...], e.g. band cost shift minus in-domain =
+    [(+1, "sc2st|real"), (-1, "sc2st|band"), (-1, "cv|real"), (+1, "cv|band")]. Each resample draws every
+    stratum of people once and applies the draw to every table, so a person in several tables moves together.
+    """
+    people = [s for st in strata for s in st]
+    col = {s: i for i, s in enumerate(people)}
+    rng = np.random.default_rng(seed)
+    W = np.zeros((n_boot, len(people)))
+    off = 0
+    for st in strata:
+        idx = rng.integers(0, len(st), (n_boot, len(st)))
+        np.add.at(W, (np.arange(n_boot)[:, None], off + idx), 1)
+        off += len(st)
+    point = {m: 0.0 for m in metrics}
+    boot = {m: np.zeros(n_boot) for m in metrics}
+    for w, key in contrast:
+        subs = sorted(cms[key])
+        A = np.stack([cms[key][s] for s in subs])
+        full, res = scores_batch(A.sum(0)), scores_batch(np.einsum("bs,sij->bij", W[:, [col[s] for s in subs]], A))
+        for m in metrics:
+            point[m] += w * float(full[m])
+            boot[m] += w * res[m]
+    out = {}
+    for m in metrics:
+        lo, hi = np.nanpercentile(boot[m], [2.5, 97.5])
+        out[m] = {"diff": point[m], "lo": float(lo), "hi": float(hi)}
+    return out
