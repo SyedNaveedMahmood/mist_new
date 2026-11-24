@@ -281,3 +281,6 @@ The external dev evaluation of the E0 runs goes ahead on all four datasets after
 - **External dev evaluation (D2) done:**
   - 81 CPU evaluations, no failures; reports/external_dev.md.
   - Person counts match the splits (HMC 91, DOD-H 15, CAP 63, ISRUC v2 65 = 49 ISRUC-M + 16 ISRUC-A). No holdout person was evaluated (checked against the split files).
+- **Addition (owner, 2026-11-24, after session 2 started; CPU only):** full-rate cascade seed-0 fold models on the external development parts (real cell, D-017 to D-020 rules), pair `cascade - cascade2_placebo` per dataset, EXPLORATORY.
+  - **5% rule:** a guard waits for 8 epochs of the first S2-2 training (`e1_raw_whitened_cv0_s0`), takes the mean epoch time of epochs 3-8 as baseline, starts the 20 evaluations (CPU, nice 19, 2 parallel, 4 threads each), and compares the mean of the next 6 epochs. Over 5% slower: it stops them and they run after the session. Log: runs/logs/cascade_ext_guard.log.
+  - **Session-2 report line:** `scripts/external_report.py` writes one line (reports/external_dev_shape_line.txt). Rule fixed before any cascade external number was read: per dataset row (ISRUC-M and ISRUC-A separately, not "all"), macro-F1 difference is negative if the 95% interval lies below 0, positive if above, else neutral. `scripts/session_report.py 2` adds it after sections a) to f).

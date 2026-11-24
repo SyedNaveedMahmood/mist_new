@@ -50,3 +50,20 @@ def test_external_report(tmp_path, monkeypatch):
     md = (tmp_path / "x.md").read_text()
     assert md.index("Lead rows") < md.index("| arm | row |") and "INTERIM" in md and "comparison with pooled papers only" in md and "holdouts stay closed" in md
     assert er.role("cascade2_absolute", "isruc", "ISRUC-A").startswith("descriptive")
+
+
+def test_shape_line(tmp_path, monkeypatch):
+    """Full-rate cascade - cascade2_placebo verdict per dataset row; ISRUC 'all' excluded; NOT TESTED when absent."""
+    er = script()
+    monkeypatch.chdir(tmp_path)
+    rng = np.random.default_rng(1)
+    subs = {"isruc": [f"ISRUC1:{i:03d}" for i in range(9)], "hmc": [f"HMC:{i:03d}" for i in range(6)]}
+    assert "NOT TESTED" in er.shape_line({})
+    for arm, boost in (("cascade", -30), ("cascade2_placebo", 0)):
+        for f in range(5):
+            r = tmp_path / "runs" / f"e1_{arm}_cv{f}_s0"; r.mkdir(parents=True)
+            for ds, ss in subs.items():
+                write_eval(r / f"eval_test_ext-{ds}-dev_rule.json", ds, ss, rng, boost)
+    line = er.shape_line(er.build(["cascade", "cascade2_placebo"], [0], 300))
+    assert "HMC negative" in line and "ISRUC-M negative" in line and "ISRUC-A negative" in line
+    assert "all " not in line and "EXPLORATORY" in line

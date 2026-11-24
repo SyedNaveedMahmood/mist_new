@@ -30,8 +30,10 @@ LEAD = [("cascade2_placebo", "raw", "factorisation without shape vs raw (H3 dire
         ("cascade2", "cascade2_placebo", "shape access (H1 direction), INTERIM")]
 PAIRS = LEAD + [("raw_whitened", "raw", "night whitening alone, EXPLORATORY"),
                 ("cascade2_placebo", "raw_whitened", "gain/rhythm split on top of whitening, EXPLORATORY"),
-                ("attnsleep", "raw", "descriptive")]
+                ("attnsleep", "raw", "descriptive"),
+                ("cascade", "cascade2_placebo", "full-rate shape access, EXPLORATORY")]   # owner 2026-11-24
 INTERIM_ARMS = ("cascade2", "cascade2_placebo", "raw_whitened")
+EXPLORATORY_ARMS = ("raw_whitened", "cascade")
 
 
 def runs_of(arm, seeds):
@@ -111,6 +113,28 @@ def build(arms, seeds, n_boot):
     return res
 
 
+def shape_line(res) -> str:
+    """One line for the session-2 report (owner 2026-11-24): is full-rate shape neutral or negative on the external
+    development parts? Rule fixed before any cascade external number was read: per dataset row (ISRUC-M and
+    ISRUC-A separately, not "all"), macro-F1 of cascade - cascade2_placebo is negative if the 95% interval lies
+    below 0, positive if above 0, else neutral."""
+    parts = []
+    for ds, r in res.items():
+        for p in r["pairs"]:
+            if p["pair"] != "cascade - cascade2_placebo" or p["row"] == "all" and ds == "isruc":
+                continue
+            d = p["mf1"]
+            v = "negative" if d["hi"] < 0 else "positive" if d["lo"] > 0 else "neutral"
+            name = p["row"] if ds == "isruc" else NAMES[ds]
+            parts.append(f"{name} {v} ({100 * d['diff']:+.1f} [{100 * d['lo']:+.1f}, {100 * d['hi']:+.1f}], "
+                         f"{p['n_models']} fold models)")
+    if not parts:
+        return ("Full-rate shape on the external development parts (cascade - cascade2_placebo, seed 0, EXPLORATORY): "
+                "NOT TESTED yet (no cascade external evaluation files).")
+    return ("Full-rate shape on the external development parts (cascade - cascade2_placebo, macro-F1, seed 0, "
+            "EXPLORATORY; negative/neutral = 95% interval below 0/includes 0): " + "; ".join(parts) + ".")
+
+
 def role(arm, ds, row):
     if ds != "isruc":
         return ""
@@ -154,7 +178,8 @@ def write(res, seeds, out_md, out_json):
               "| --- | --- | ---: | ---: | ---: | ---: | " + " | ".join("---:" for _ in STAGES) + " | --- |"]
         for arm, v in r["arms"].items():
             for k, s in v["rows"].items():
-                note = "; ".join(x for x in (role(arm, ds, k), "INTERIM" if arm in INTERIM_ARMS else "") if x)
+                note = "; ".join(x for x in (role(arm, ds, k), "INTERIM" if arm in INTERIM_ARMS else "",
+                                                 "EXPLORATORY" if arm in EXPLORATORY_ARMS else "") if x)
                 L.append(f"| {arm} | {k} | {v['n_eval_files']}/{v['n_runs']} | {s['n_subjects']} | {fmt(s['mf1'])} "
                          f"[{fmt(s['mf1_lo'])}, {fmt(s['mf1_hi'])}] | {s['kappa']:.3f} | "
                          + " | ".join(fmt(s[f'f1_{x}']) for x in STAGES) + f" | {note} |")
@@ -172,13 +197,14 @@ def write(res, seeds, out_md, out_json):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", default="0")
-    ap.add_argument("--arms", default="raw,attnsleep,cascade2,cascade2_placebo,raw_whitened")
+    ap.add_argument("--arms", default="raw,attnsleep,cascade2,cascade2_placebo,raw_whitened,cascade")
     ap.add_argument("--n-boot", type=int, default=10000)
     ap.add_argument("--out", default="reports/external_dev")
     a = ap.parse_args()
     seeds = [int(s) for s in a.seeds.split(",")]
     res = build(a.arms.split(","), seeds, a.n_boot)
     write(res, seeds, f"{a.out}.md", f"{a.out}.json")
+    Path(f"{a.out}_shape_line.txt").write_text(shape_line(res) + "\n")
     print(f"{a.out}.md")
 
 

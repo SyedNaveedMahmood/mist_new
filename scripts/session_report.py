@@ -68,6 +68,9 @@ if a.n == 2:            # owner's order for the session-2 report, a) to f) first
     r = subprocess.run([sys.executable, "scripts/aggregate.py", "s2"], capture_output=True, text=True, check=True)
     body = Path(f"{r.stdout.strip().splitlines()[-1]}.md").read_text().split("\n", 1)[1]
     L += ["", "## Session 2 questions, in the owner's order", "", body.replace("\n## ", "\n### ")]
+    sl = Path("reports/external_dev_shape_line.txt")    # owner 2026-11-24, from scripts/external_report.py
+    L += ["", "**Full-rate shape, external development parts:** " + (sl.read_text().strip() if sl.exists() else
+          "NOT TESTED (run scripts/external_report.py first).")]
 seed_sets = a.seeds.split(";") if a.seeds else [None]
 for ss in seed_sets:
     out = f"reports/e1_interim_s{ss.replace(',', '')}" if ss else "reports/e1"
