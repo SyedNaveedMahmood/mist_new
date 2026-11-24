@@ -209,3 +209,12 @@ replication:
     best_test_epoch_OPTIMISTIC: {acc: 0.8378, mf1: 0.7853, kappa: 0.7791, f1: [0.890, 0.459, 0.883, 0.897, 0.796]}
     status: VERIFIED
     note: 'Published Table V reproduced under the published repo''s selection (epoch with best TEST accuracy per fold): MF1 78.5 vs 78.1, acc 83.8 vs 84.4. Without test selection (final epoch) MF1 is 75.0, 3.1 points below. The difference is the effect of choosing the epoch on the test fold (D-001). Weakest folds: subject 11 (final acc 0.618), 08 (0.646). 368 s/fold, run concurrently with E0 training. A check of our AttnSleep code and recipe only; not a project result.'
+  - id: external_dev_cascade_fullrate_s0
+    date: '2026-11-24'
+    commit: b994c18
+    script: scripts/evaluate.py --run runs/e1_cascade_cv{0-4}_s0 --dataset {hmc,dodh,cap,isruc} --part dev --channel rule --cells core (CPU, during session 2; guard measured +2.2% training slowdown); scripts/external_report.py
+    data: development parts only (HMC 91, DOD-H 15, CAP 63, ISRUC-M 49, ISRUC-A 16 people); external holdouts closed
+    evals: ['runs/e1_cascade_cv*_s0/eval_test_ext-*-dev_rule.json', reports/external_dev.json]
+    result: "cascade - cascade2_placebo macro-F1 (points, 95% paired subject bootstrap): HMC -5.9 [-7.1, -4.8] negative; DOD-H -3.8 [-5.9, -2.0] negative; CAP +0.1 [-0.4, +0.7] neutral; ISRUC-M -1.0 [-2.2, +0.1] inconclusive; ISRUC-A +1.4 [+0.3, +2.6] positive"
+    status: EXPLORATORY
+    note: 'Owner addition 2026-11-24; labels by the four-way rule fixed before any number existed (D-026 addendum). Seed 0 only, development-grade.'

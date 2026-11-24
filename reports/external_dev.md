@@ -19,6 +19,7 @@ Caveats: DOD-H development part has 15 people, so its intervals are wide. ISRUC 
 | attnsleep | all | 5/5 | 91 | 52.3 [49.9, 54.5] | 0.418 | 66.9 | 28.1 | 60.7 | 49.8 | 55.9 |  |
 | cascade2 | all | 5/5 | 91 | 56.8 [54.4, 59.1] | 0.460 | 66.0 | 35.9 | 63.1 | 49.8 | 69.0 | INTERIM |
 | cascade2_placebo | all | 5/5 | 91 | 60.6 [58.1, 63.0] | 0.517 | 73.5 | 37.7 | 67.4 | 51.5 | 73.0 | INTERIM |
+| cascade | all | 5/5 | 91 | 54.7 [51.8, 57.4] | 0.442 | 63.9 | 32.8 | 61.1 | 47.0 | 68.7 | EXPLORATORY |
 
 All pairs:
 
@@ -27,6 +28,7 @@ All pairs:
 | cascade2_placebo - raw | factorisation without shape vs raw (H3 direction), INTERIM | all | 5 | +9.7 [+8.3, +11.1] | +7.1 [+5.5, +8.8] | +41.3 [+35.1, +47.7] | 91 |
 | cascade2 - cascade2_placebo | shape access (H1 direction), INTERIM | all | 5 | -3.9 [-4.8, -3.0] | -1.8 [-2.9, -0.7] | -17.5 [-21.6, -13.6] | 91 |
 | attnsleep - raw | descriptive | all | 5 | +1.3 [+0.6, +2.1] | -2.4 [-3.9, -1.1] | +9.2 [+5.9, +12.5] | 91 |
+| cascade - cascade2_placebo | full-rate shape access, EXPLORATORY | all | 5 | -5.9 [-7.1, -4.8] | -4.8 [-6.0, -3.7] | -24.7 [-30.2, -19.6] | 91 |
 
 ## DOD-H
 
@@ -43,6 +45,7 @@ All pairs:
 | attnsleep | all | 5/5 | 15 | 61.7 [58.2, 64.6] | 0.587 | 66.2 | 19.7 | 81.1 | 80.5 | 61.2 |  |
 | cascade2 | all | 5/5 | 15 | 69.1 [66.1, 71.7] | 0.639 | 68.8 | 37.3 | 80.2 | 74.3 | 84.7 | INTERIM |
 | cascade2_placebo | all | 5/5 | 15 | 72.4 [69.5, 74.6] | 0.687 | 75.4 | 41.5 | 83.4 | 75.1 | 86.4 | INTERIM |
+| cascade | all | 5/5 | 15 | 68.6 [64.8, 72.0] | 0.635 | 68.7 | 36.3 | 79.6 | 73.8 | 84.5 | EXPLORATORY |
 
 All pairs:
 
@@ -51,6 +54,7 @@ All pairs:
 | cascade2_placebo - raw | factorisation without shape vs raw (H3 direction), INTERIM | all | 5 | +6.7 [+3.7, +10.0] | +9.1 [+4.3, +13.8] | +24.2 [+11.9, +38.4] | 15 |
 | cascade2 - cascade2_placebo | shape access (H1 direction), INTERIM | all | 5 | -3.3 [-4.4, -2.2] | -4.2 [-5.5, -2.9] | -12.3 [-17.3, -7.8] | 15 |
 | attnsleep - raw | descriptive | all | 5 | -4.0 [-6.3, -1.7] | -12.7 [-19.0, -8.0] | -7.1 [-14.7, +0.6] | 15 |
+| cascade - cascade2_placebo | full-rate shape access, EXPLORATORY | all | 5 | -3.8 [-5.9, -2.0] | -5.2 [-7.7, -2.9] | -13.6 [-22.3, -6.7] | 15 |
 
 ## CAP
 
@@ -67,6 +71,7 @@ All pairs:
 | attnsleep | all | 5/5 | 63 | 60.9 [58.4, 63.1] | 0.570 | 76.0 | 19.4 | 73.8 | 67.1 | 68.0 |  |
 | cascade2 | all | 5/5 | 63 | 63.9 [60.5, 67.0] | 0.574 | 72.9 | 30.1 | 71.8 | 65.2 | 79.6 | INTERIM |
 | cascade2_placebo | all | 5/5 | 63 | 64.9 [61.3, 68.1] | 0.590 | 73.9 | 31.8 | 73.0 | 65.3 | 80.6 | INTERIM |
+| cascade | all | 5/5 | 63 | 65.0 [61.5, 68.2] | 0.590 | 76.1 | 30.5 | 72.5 | 65.5 | 80.6 | EXPLORATORY |
 
 All pairs:
 
@@ -75,6 +80,7 @@ All pairs:
 | cascade2_placebo - raw | factorisation without shape vs raw (H3 direction), INTERIM | all | 5 | +1.3 [-0.6, +3.2] | +2.2 [-0.8, +5.4] | +4.5 [-2.8, +11.6] | 63 |
 | cascade2 - cascade2_placebo | shape access (H1 direction), INTERIM | all | 5 | -1.0 [-1.7, -0.3] | -1.6 [-2.6, -0.6] | -3.3 [-5.9, -0.8] | 63 |
 | attnsleep - raw | descriptive | all | 5 | -2.7 [-3.7, -1.7] | -10.2 [-12.7, -7.7] | -3.5 [-6.7, +0.1] | 63 |
+| cascade - cascade2_placebo | full-rate shape access, EXPLORATORY | all | 5 | +0.1 [-0.4, +0.7] | -1.3 [-2.1, -0.4] | +1.9 [-0.4, +4.3] | 63 |
 
 ## ISRUC
 
@@ -103,6 +109,9 @@ All pairs:
 | cascade2_placebo | ISRUC-M | 5/5 | 49 | 65.3 [62.8, 67.6] | 0.570 | 73.2 | 38.1 | 70.2 | 69.4 | 75.8 | INTERIM |
 | cascade2_placebo | ISRUC-A | 5/5 | 16 | 64.3 [60.0, 67.9] | 0.566 | 70.3 | 37.3 | 70.5 | 68.3 | 75.1 | INTERIM |
 | cascade2_placebo | all | 5/5 | 65 | 65.1 [62.9, 67.0] | 0.569 | 72.6 | 37.9 | 70.2 | 69.1 | 75.6 | comparison with pooled papers only; INTERIM |
+| cascade | ISRUC-M | 5/5 | 49 | 64.3 [61.3, 67.1] | 0.554 | 72.8 | 38.0 | 67.5 | 68.7 | 74.7 | EXPLORATORY |
+| cascade | ISRUC-A | 5/5 | 16 | 65.7 [61.3, 69.3] | 0.579 | 74.6 | 39.6 | 69.4 | 68.6 | 76.2 | EXPLORATORY |
+| cascade | all | 5/5 | 65 | 64.7 [62.0, 66.9] | 0.561 | 73.2 | 38.4 | 68.0 | 68.7 | 75.1 | comparison with pooled papers only; EXPLORATORY |
 
 All pairs:
 
@@ -117,4 +126,7 @@ All pairs:
 | attnsleep - raw | descriptive | ISRUC-M | 5 | -1.1 [-2.3, +0.1] | -7.0 [-9.1, -4.8] | +1.5 [-3.3, +6.5] | 49 |
 | attnsleep - raw | descriptive | ISRUC-A | 5 | -3.2 [-5.0, -1.1] | -9.8 [-14.4, -6.4] | -6.2 [-14.6, +4.0] | 16 |
 | attnsleep - raw | descriptive | all | 5 | -1.6 [-2.6, -0.5] | -7.6 [-9.5, -5.7] | -0.3 [-4.5, +4.2] | 65 |
+| cascade - cascade2_placebo | full-rate shape access, EXPLORATORY | ISRUC-M | 5 | -1.0 [-2.2, +0.1] | -0.0 [-1.4, +1.2] | -4.9 [-10.2, +0.1] | 49 |
+| cascade - cascade2_placebo | full-rate shape access, EXPLORATORY | ISRUC-A | 5 | +1.4 [+0.3, +2.6] | +2.4 [+0.7, +4.4] | +4.5 [-0.0, +9.4] | 16 |
+| cascade - cascade2_placebo | full-rate shape access, EXPLORATORY | all | 5 | -0.4 [-1.4, +0.5] | +0.6 [-0.6, +1.6] | -2.6 [-7.1, +1.4] | 65 |
 
